@@ -40,7 +40,7 @@ private:
     static T getProperty(Poco::JSON::Object::Ptr objectPtr, const std::string& propertyName,
                          CheckTypeFunc checkTypeFunc, ConvertFunc convertFunc) {
         if (!objectPtr->has(propertyName)) {
-            throw Poco::Exception(Poco::format("Property %s not found", propertyName));
+            throw Poco::Exception(Poco::format("Property [%s] not found", propertyName));
         }
 
         Poco::Dynamic::Var propertyVar;
@@ -48,11 +48,11 @@ private:
             propertyVar = objectPtr->get(propertyName);
         }
         catch (const Poco::Exception& ex) {
-            throw Poco::Exception(Poco::format("Failed to read property %s", propertyName), ex);
+            throw Poco::Exception(Poco::format("Failed to read property [%s]", propertyName), ex);
         }
 
         if (!checkTypeFunc(propertyVar)) {
-            throw Poco::Exception(Poco::format("Failed to read property %s: unexpected type", propertyName));
+            throw Poco::Exception(Poco::format("Failed to read property [%s]: unexpected type", propertyName));
         }
 
         try {
@@ -60,7 +60,7 @@ private:
             return result;
         }
         catch (const Poco::Exception& ex) {
-            throw Poco::Exception(Poco::format("Failed to convert property %s", propertyName), ex);
+            throw Poco::Exception(Poco::format("Failed to convert property \"%s\"", propertyName), ex);
         }
     }
 };

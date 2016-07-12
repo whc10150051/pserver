@@ -8,7 +8,7 @@
 
 #pragma once
 
-#define RES_PRODUCT_BUILD_DATE Вт июл  5 21:42:26 MSK 2016
+#define RES_PRODUCT_BUILD_DATE Вс июл 10 15:47:52 MSK 2016
 #define RES_PRODUCT_BUILD_NUMBER 1
 #define RES_PRODUCT_BUILD_USER madrus
 

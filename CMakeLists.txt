@@ -47,30 +47,33 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${CMAKE_BUI
 include(${CMAKE_SOURCE_DIR}/cmake/BaseConfiguration.cmake)
 
 ############# Source code structure ############################################
+set(SRC_MODULES_IN5102 ${CMAKE_SOURCE_DIR}/../build/in5102_firmware/modules/)
+
 set(SOURCES
         main.cpp
         src/Server.cpp
-        src/EchoConnection.cpp
-        src/MeasureConnection.cpp
+        src/Connection.cpp
         )
 
 set(HEADERS
         src/Server.h
-        src/EchoConnection.h
         src/utils/Logger.h
         src/Const.h
-        src/MeasureConnection.h
+        src/Connection.h
         )
 
 set(TASK_SOURCES
         src/tasks/AbstractTask.cpp
         src/tasks/FittingTask.cpp
-        src/tasks/TaskFactory.cpp)
+        src/tasks/TaskFactory.cpp
+        src/tasks/EchoTask.cpp
+        src/tasks/StatusTask.cpp src/tasks/StatusTask.h src/tasks/ScanResonanceTask.cpp src/tasks/ScanResonanceTask.h)
 
 set(TASK_HEADERS
         src/tasks/AbstractTask.h
         src/tasks/FittingTask.h
         src/tasks/TaskFactory.h
+        src/tasks/EchoTask.h
         )
 
 set(TASK_FILES
@@ -80,10 +83,13 @@ set(TASK_FILES
 
 set(UTIL_SOURCES
         src/utils/JsonHelper.cpp
-        src/utils/LogConfiguration.cpp src/utils/LogConfiguration.h)
+        src/utils/LogConfiguration.cpp
+        src/utils/StringHelper.cpp)
 
 set(UTIL_HEADERS
         src/utils/JsonHelper.h
+        src/utils/LogConfiguration.h
+        src/utils/StringHelper.h
         )
 
 set(UTIL_FILES

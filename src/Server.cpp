@@ -3,7 +3,7 @@
 //
 
 #include "Server.h"
-#include "MeasureConnection.h"
+#include "Connection.h"
 #include <Poco/SyslogChannel.h>
 #include <Poco/ConsoleChannel.h>
 #include <Poco/FileChannel.h>
@@ -13,7 +13,7 @@
 #include <Poco/Path.h>
 
 Server::Server(int port, Poco::Net::TCPServerParams* params) :
-        TCPServer(new Poco::Net::TCPServerConnectionFactoryImpl<MeasureConnection>(),
+        TCPServer(new Poco::Net::TCPServerConnectionFactoryImpl<Connection>(),
         Poco::Net::ServerSocket(port), params), _logger(Poco::Logger::get("Server")) {
     configureLogger();
     LOG_DEBUG("Server start");
@@ -24,7 +24,7 @@ Server::Server(int port, Poco::Net::TCPServerParams* params) :
 Server::~Server() {
     LOG_DEBUG("Server stop");
     stop();
-    LOG_DEBUG("Server stopped");
+    LOG_DEBUG("Server is stopped");
 }
 
 void Server::configureLogger() {
@@ -55,7 +55,6 @@ void Server::configureLogger() {
         Poco::Logger::root().setLevel(Poco::Message::Priority::PRIO_TRACE);
         Poco::Logger::root().setChannel(splitter);
     } catch (Poco::Exception& ex) {
-        std::cerr << ex.displayText() << std::endl;
+        std::cerr << "Server::configureLogger: " << ex.displayText() << std::endl;
     }
 }
-

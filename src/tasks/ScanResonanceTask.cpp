@@ -1,13 +1,17 @@
 //
-// Created by madrus on 26.06.16.
+// Created by madrus on 10.07.16.
 //
 
-#include "FittingTask.h"
+#include "ScanResonanceTask.h"
+
+
 #include "src/utils/JsonHelper.h"
 #include <Poco/Random.h>
 
-FittingTask::FittingTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(config, "FittingTask") {
+ScanResonanceTask::ScanResonanceTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(config, "FittingTask") {
     LOG_DEBUG("Begin FittingTask");
+
+
     _sensIsHi = JsonHelper::getIntProperty(config, "sensishi");
     LOG_DEBUG("sensIsHi: %d", (int) _sensIsHi);
     _voltIsHi = JsonHelper::getIntProperty(config, "voltishi");
@@ -30,10 +34,10 @@ FittingTask::FittingTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(c
     LOG_DEBUG("size: %d", (int) _size);
 }
 
-bool FittingTask::run() {
+bool ScanResonanceTask::run() {
 // output
 //    {
-//        "name": "fitting",
+//        "name": "scan",
 //        "size": 20,
 //        "data": [29.9, 71.5, 106.4, 129.2, 144.0, 176.0, 135.6, 148.5, 16.4, 194.1, 95.6, 54.4]
 //    }
