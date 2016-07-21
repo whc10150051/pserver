@@ -5,6 +5,9 @@
 #pragma once
 
 #include "AbstractTask.h"
+#include "in5102_types.h"
+#include "module_formation_signal.h"
+#include "module_of_measurements.h"
 #include <Poco/JSON/Object.h>
 
 /**
@@ -17,14 +20,9 @@ public:
     virtual bool run() override;
 
 private:
-    bool _sensIsHi = false;
-    bool _voltIsHi = false;
-    int _channel = 0;
-    int _relay = 0;
-    double _tau = 0;
-    int _l = 0;
-    int _m = 10;
-    int _nStart = 0;
-    int _lPost = 0;
-    int _size = 0;
+    PropertySensor _propSensor;
+    ParamProbing _paramProbing;
+    PositionData _position;
+    std::vector<ParamProbingSignal> _paramSignals;
+    int _scanSteps;
 };

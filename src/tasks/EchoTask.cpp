@@ -3,10 +3,7 @@
 //
 
 #include "EchoTask.h"
-
-
-#include "FittingTask.h"
-#include "src/utils/JsonHelper.h"
+#include "JsonHelper.h"
 
 EchoTask::EchoTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(config, "EchoTask") {
     LOG_DEBUG("Begin EchoTask");
@@ -22,7 +19,7 @@ bool EchoTask::run() {
 
     _answer = new Poco::JSON::Object(true);
     _answer->set("name", getName());
-    _answer->set("status", "OK");
+    _answer->set("status", "ok");
     _answer->set("data", _data);
 
     return true;

@@ -39,7 +39,7 @@ void Connection::run() {
             answer->set("code", ex.displayText());
             send(StringHelper::objectToString(answer));
         } catch (Poco::Exception &ex_) {
-            LOG_DEBUG("Can not send error answer from Connection::run() : %s ( error answer: %s)",
+            LOG_ERROR("Can not send error answer from Connection::run() : %s ( error answer: %s)",
                       ex_.displayText(), ex.displayText());
         }
     }

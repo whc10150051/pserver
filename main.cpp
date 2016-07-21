@@ -10,8 +10,6 @@
 #include <src/utils/StringHelper.h>
 #include "Poco/Timestamp.h"
 
-using namespace std;
-
 // посылка объекта
 void send(Poco::Logger& _logger, Poco::Net::StreamSocket& ss, Poco::JSON::Object::Ptr object) {
     std::string str = StringHelper::objectToString(object);
@@ -55,7 +53,7 @@ std::string receive(Poco::Logger& _logger, Poco::Net::StreamSocket& ss) {
         }
     }
     // если большие данные. то не печатать
-//    LOG_DEBUG("receive: %s", answer);
+    LOG_DEBUG("receive: %s", answer);
     LOG_DEBUG("receive size: %d byte", (int) answer.size());
 
     Poco::Timestamp::TimeDiff diff = Poco::Timestamp() - begin;
@@ -149,6 +147,8 @@ int main() {
     Poco::Thread threadStatus;
     threadStatus.start(runnable);
 
+#if 0
+    // запуск задачи по притирке
     {
         Poco::Net::SocketAddress sa("localhost", srv.socket().address().port());
         Poco::Net::StreamSocket ss(sa);
@@ -177,7 +177,10 @@ int main() {
         ss.close();
     }
     Poco::Thread::sleep(10000);
+#endif
 
+#if 0
+    // эхо
     {
     // create task Echo
         Poco::Net::SocketAddress sa("localhost", srv.socket().address().port());
@@ -196,8 +199,53 @@ int main() {
         // close
         ss.close();
     }
-
     sleep(1);
+#endif
+
+
+    // запуск задачи по почастотке
+    {
+        Poco::Net::SocketAddress sa("localhost", srv.socket().address().port());
+        Poco::Net::StreamSocket ss(sa);
+        // create task ScanResonanceTask
+        Poco::JSON::Object::Ptr scan = new Poco::JSON::Object(true);
+        scan->set("task", "scan");
+        scan->set("relay", 0);
+        scan->set("channel", 0);
+        scan->set("sensishi", 0);
+        scan->set("voltishi", 0);
+        scan->set("mode", 0);
+        scan->set("n", 0);
+        scan->set("r", 0);
+        scan->set("nstart", 2100);
+        scan->set("lpost", 200000);
+        scan->set("scansteps", 12);
+        // это тест передачи многокомпонентного сигнала
+        size_t numComponent = 5;
+        Poco::JSON::Array::Ptr componentArray = new Poco::JSON::Array();
+        for (size_t idx = 0; idx < numComponent; ++idx) {
+            Poco::JSON::Object::Ptr component = new Poco::JSON::Object(true);
+            component->set("m", std::to_string(10));
+            component->set("l", std::to_string(1));
+            component->set("tau", std::to_string(50)); // millsec
+            component->set("mfo", std::to_string(50));
+            componentArray->set(idx, component);
+        }
+        scan->set("probingsignal", componentArray);
+
+
+        // send
+        send(_logger, ss, scan);
+
+        // receive
+        receive(_logger, ss);
+
+        Poco::Thread::sleep(100);
+        // close
+        ss.close();
+    }
+    Poco::Thread::sleep(10000);
+
 
     threadStatus.join();
     return 0;

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 2.8)
 ############# Global settings ##################################################
 # Turn on project folders feature
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -9,6 +9,10 @@ set(CMAKE_CONFIGURATION_TYPES Debug Release CACHE TYPE INTERNAL FORCE )
 ############# Main project definition ##########################################
 
 project(pserver)
+
+add_subdirectory(src/modules)
+
+set(PROJECT_LIB_DIR /opt/encotes_64/lib)
 
 ############# RPATH ############################################################
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
@@ -47,7 +51,6 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${CMAKE_BUI
 include(${CMAKE_SOURCE_DIR}/cmake/BaseConfiguration.cmake)
 
 ############# Source code structure ############################################
-set(SRC_MODULES_IN5102 ${CMAKE_SOURCE_DIR}/../build/in5102_firmware/modules/)
 
 set(SOURCES
         main.cpp
@@ -67,13 +70,17 @@ set(TASK_SOURCES
         src/tasks/FittingTask.cpp
         src/tasks/TaskFactory.cpp
         src/tasks/EchoTask.cpp
-        src/tasks/StatusTask.cpp src/tasks/StatusTask.h src/tasks/ScanResonanceTask.cpp src/tasks/ScanResonanceTask.h)
+        src/tasks/StatusTask.cpp
+        src/tasks/ScanResonanceTask.cpp
+        src/tasks/GetTask.cpp src/tasks/GetTask.h)
 
 set(TASK_HEADERS
         src/tasks/AbstractTask.h
         src/tasks/FittingTask.h
         src/tasks/TaskFactory.h
         src/tasks/EchoTask.h
+        src/tasks/StatusTask.h
+        src/tasks/ScanResonanceTask.h
         )
 
 set(TASK_FILES
@@ -84,7 +91,8 @@ set(TASK_FILES
 set(UTIL_SOURCES
         src/utils/JsonHelper.cpp
         src/utils/LogConfiguration.cpp
-        src/utils/StringHelper.cpp)
+        src/utils/StringHelper.cpp
+        )
 
 set(UTIL_HEADERS
         src/utils/JsonHelper.h
@@ -97,7 +105,6 @@ set(UTIL_FILES
         ${UTIL_HEADERS}
         )
 
-
 set(ALL_SOURCES
         ${SOURCES}
         ${HEADERS}
@@ -108,14 +115,25 @@ set(ALL_SOURCES
 source_group("Source Files" FILES ${SOURCES})
 source_group("Header Files" FILES ${HEADERS})
 source_group("Util Files" FILES ${UTIL_FILES})
-source_group("Task Files" FILES ${Task_FILES})
+source_group("Task Files" FILES ${TASK_FILES})
 
 ############# Compiler includes ################################################
 include_directories(${PROJECT_SOURCE_DIR}/)
+include_directories(${PROJECT_SOURCE_DIR}/src)
+include_directories(${PROJECT_SOURCE_DIR}/src/utils)
 include_directories(${POCO_INCLUDE_DIRS})
+
+include_directories(src/modules/common)
+include_directories(src/modules/module_mng_device)
+include_directories(src/modules/module_mng_device/src)
+include_directories(src/modules/module_mng_device/emul)
+include_directories(src/modules/module_of_measurements)
+include_directories(src/modules/module_formation_signal)
 
 ############# Linker search path ###############################################
 link_directories(${POCO_LIBRARY_DIR})
+# поменять на PATH
+link_directories(${PROJECT_LIB_DIR})
 
 ############# Target ###########################################################
 add_executable(pserver ${ALL_SOURCES})
@@ -127,9 +145,9 @@ setup_target_output(pserver)
 ############# Target dependencies ##############################################
 if (UNIX)
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_link_libraries(pserver PocoFoundationd PocoJSONd PocoNetd PocoUtild PocoXMLd pthread dl m)
+        target_link_libraries(pserver PocoFoundationd PocoJSONd PocoNetd PocoUtild PocoXMLd common module_formation_signal module_of_measurements module_mng_device pthread dl m)
     else()
-        target_link_libraries(pserver PocoFoundation PocoJSON PocoNet PocoUtil PocoXML pthread dl m)
+        target_link_libraries(pserver PocoFoundation PocoJSON PocoNet PocoUtil PocoXML common module_formation_signal module_of_measurements module_mng_device pthread dl m)
     endif()
 endif(UNIX)
 

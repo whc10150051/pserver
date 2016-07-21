@@ -2,11 +2,12 @@
 // Created by madrus on 26.06.16.
 //
 
-#include <src/utils/JsonHelper.h>
+#include "JsonHelper.h"
 #include "TaskFactory.h"
 #include "FittingTask.h"
 #include "EchoTask.h"
 #include "StatusTask.h"
+#include "ScanResonanceTask.h"
 
 AbstractTask::Ptr TaskFactory::create(const Poco::JSON::Object::Ptr& config) {
     Poco::Logger& _logger(Poco::Logger::get("TaskFactory"));
@@ -20,8 +21,10 @@ AbstractTask::Ptr TaskFactory::create(const Poco::JSON::Object::Ptr& config) {
         return std::make_shared<EchoTask>(config);
     } else if (taskStr == "status") {
         return std::make_shared<StatusTask>(config);
+    } else if (taskStr == "scan") {
+        return std::make_shared<ScanResonanceTask>(config);
     } else if (taskStr == "measure") {
-//        return std::make_shared<FittingTask>(config);
+//        return std::make_shared<ScanResonanceTask>(config);
 //        return nullptr;
     }
     LOG_DEBUG("Create exeption");
