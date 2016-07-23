@@ -7,12 +7,13 @@
 #include "AbstractTask.h"
 #include <Poco/JSON/Object.h>
 
-class GetTask : public AbstractTask {
+class UniversalTask : public AbstractTask {
 public:
-    GetTask(const Poco::JSON::Object::Ptr& config);
+    UniversalTask(const Poco::JSON::Object::Ptr& config);
 
     virtual bool run() override;
 
 private:
+    std::string _type;
     std::string _data;
 };

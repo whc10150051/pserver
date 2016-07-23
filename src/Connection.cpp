@@ -4,6 +4,7 @@
 
 #include "Connection.h"
 #include "tasks/TaskFactory.h"
+#include "JsonHelper.h"
 #include "Server.h"
 #include <Poco/JSON/Object.h>
 #include <Poco/JSON/Parser.h>
@@ -12,26 +13,24 @@
 void Connection::run() {
     LOG_DEBUG("Begin connection");
     AbstractTask::Ptr task = nullptr;
+    std::string name = "unknown";
     try {
         std::string request = receive();
         if (!request.empty()) {
             Poco::Dynamic::Var dataVar = Poco::JSON::Parser().parse(request);
             Poco::JSON::Object::Ptr config = dataVar.extract<Poco::JSON::Object::Ptr>();
+            name = JsonHelper::getStringProperty(config, "task");
 
             task = TaskFactory::create(config);
-            if (task->run()) {
+            if (task->run()) { // TODO по сути тут всегда правда, пока
                 send(StringHelper::objectToString(task->getAnswer()));
             }
         } else {
             LOG_ERROR("request is empty");
         }
     } catch (Poco::Exception& ex) {
-        LOG_ERROR("run: %s", ex.displayText());
+        LOG_ERROR("task: %s run: %s", name, ex.displayText());
 
-        std::string name = "unknown";
-        if (task) {
-            name = task->getName();
-        }
         try {
             Poco::JSON::Object::Ptr answer = new Poco::JSON::Object(true);
             answer->set("name", name);

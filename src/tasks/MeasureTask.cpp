@@ -1,16 +1,17 @@
 //
-// Created by madrus on 26.06.16.
+// Created by madrus on 23.07.16.
 //
 
-#include "FittingTask.h"
-#include "JsonHelper.h"
-#include "in5102_types.h"
-#include "module_of_measurements.h"
-#include <Poco/Random.h>
-#include <Poco/Exception.h>
+#include "MeasureTask.h"
 
-FittingTask::FittingTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(config, "FittingTask") {
-    LOG_DEBUG("Begin FittingTask");
+#include "ScanResonanceTask.h"
+#include "JsonHelper.h"
+#include "utils.h"
+#include "const.h"
+#include <Poco/Random.h>
+
+MeasureTask::MeasureTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(config, "MeasureTask") {
+    LOG_DEBUG("Begin MeasureTask");
     _propSensor.num_channel = JsonHelper::getIntProperty(config, "channel");
     LOG_DEBUG("channel: %d", (int) _propSensor.num_channel);
     _propSensor.num_relay = JsonHelper::getIntProperty(config, "relay");
@@ -29,56 +30,35 @@ FittingTask::FittingTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(c
     LOG_DEBUG("n: %d", (int) _paramProbing.n);
     _paramProbing.r = JsonHelper::getIntProperty(config, "r");
     LOG_DEBUG("r: %d", (int) _paramProbing.r);
-    // по сути глушим, для притирки этого не нужно
-    _paramProbing.pagc = {0};
+
+    Poco::JSON::Array::Ptr pagc = JsonHelper::getArrayProperty(config, "pagc");
+    size_t size = pagc->size();
+    for (size_t idx = 0; idx < size; ++idx) {
+        Poco::Dynamic::Var var = pagc->get(idx);
+        _paramProbing.pagc.push_back(std::stod(var.extract<std::string>()));
+    }
+    LOG_DEBUG("page size: %d", (int) _paramProbing.pagc.size());
 
     int m = JsonHelper::getIntProperty(config, "m");
     LOG_DEBUG("m: %d", m);
     int l = JsonHelper::getIntProperty(config, "l");
     LOG_DEBUG("l: %d", l);
-    double tau = std::stod(JsonHelper::getStringProperty(config, "tau")) * 10E-3;
+    double tau = std::stod(JsonHelper::getStringProperty(config, "tau")) * 10E-3; // миллисекунды
     LOG_DEBUG("tau: %f", tau);
     double mfo = std::stod(JsonHelper::getStringProperty(config, "mfo")) * 10E-3;
     LOG_DEBUG("mfo: %f", mfo);
-
     _paramSignal = ParamProbingSignal(m, l, tau, mfo);
-
-    _sizeOut = JsonHelper::getIntProperty(config, "size");
-    LOG_DEBUG("size: %d", _sizeOut);
+    _typeSignal = JsonHelper::getStringProperty(config, "typeSignal");
 }
 
-
-// Усреднение
-int smoof(const DBL_VECTOR& data_in, DBL_VECTOR& data_out, int size) {
-
-    int size_data_measure = data_in.size();
-    if (!size || !size_data_measure || size > size_data_measure) {
-        return E_MSERVER_SMOOF;
-    }
-    // выхлоп в файл (а так же усреднение)
-    int window_size = 0; // размер окна
-    if (size != 0) {
-        window_size = size_data_measure / size;
-    }
-    for (int i = 0; i < size; ++i) {
-        double value = 0;
-        int begin_window = floor(i * window_size);
-        for (int j = 0; j < window_size; ++j) {
-            value += data_in[begin_window + j];
-        }
-
-        data_out.push_back(value / window_size);
-    }
-    return E_OK;
-}
-
-bool FittingTask::run() {
+bool MeasureTask::run() {
 // output
 //    {
-//        "name": "fitting",
+//        "name": "measure",
+//        "status": "ok",
 //        "data": [29.9, 71.5, 106.4, 129.2, 144.0, 176.0, 135.6, 148.5, 16.4, 194.1, 95.6, 54.4]
 //    }
-
+//
 #if 1
     // временная реализация без железа
     Poco::Random rnd;
@@ -102,31 +82,32 @@ bool FittingTask::run() {
 //    Poco::Thread::sleep(1000);
 #else
     // настройка зондирования
-    LOG_DEBUG("SetupGrinding");
+    LOG_DEBUG("Setup");
     Module_of_measurements measure;
-    // уже не используем
-    PAGC pagc;
-    pagc.push_back(0x00);
-    int ret = measure.SetupGrinding(_paramSignal, _propSensor, pagc);
+    int ret = measure.Setup(_paramSignal, _propSensor);
     if (ret < 0) {
-        throw Poco::Exception(Poco::format("Error setup fitting: %d", ret));
+        throw Poco::Exception(Poco::format("Error setup measure: %d", ret));
     }
-    LOG_DEBUG("RunGrinding");
-    ret = measure.RunGrinding(_propSensor.num_channel, _propSensor.num_relay, _paramProbing);
+    LOG_DEBUG("Run");
+    ret = measure.Run(_paramProbing);
     if (ret < 0) {
-        throw Poco::Exception(Poco::format("Error start fitting: %d", ret));
+        throw Poco::Exception(Poco::format("Error start measure: %d", ret));
     }
-    LOG_DEBUG("GetMFEcho");
+    LOG_DEBUG("Get signal");
     DBL_VECTOR data_measure;
-    ret = measure.GetMFEcho(_position, data_measure);
-    if (ret < 0) {
-        throw Poco::Exception(Poco::format("Error get signal fitting: %d", ret));
+    if (_typeSignal == "echo") {
+        ret = measure.GetMFEcho(_position, data_measure);
+    } else if (_typeSignal == "env") {
+        ret = measure.GetEnvMFEcho(_position, data_measure);
+    } else if (_typeSignal == "square") {
+        ret = measure.GetSquareMFEcho(_position, data_measure);
+    } else if (_typeSignal == "module") {
+        ret = measure.GetModuleMFEcho(_position, data_measure);
+    } else if (_typeSignal == "att") {
+        ret = measure.GetAttMFEcho(_position, data_measure);
     }
-    LOG_DEBUG("smoof");
-    DBL_VECTOR data_out;
-    ret = smoof(data_measure, data_out, _sizeOut);
     if (ret < 0) {
-        throw Poco::Exception(Poco::format("Error smoof signal fitting: %d", ret));
+        throw Poco::Exception(Poco::format("Error get signal (%s) measure: %d", _typeSignal, ret));
     }
 
     LOG_DEBUG("Create answer");
@@ -135,11 +116,10 @@ bool FittingTask::run() {
     _answer->set("status", "ok");
 
     Poco::JSON::Array jsonArray;
-    for (auto& item : data_out) {
+    for (auto& item : data_measure) {
         jsonArray.add(item);
     }
     _answer->set("data", jsonArray);
 #endif
     return true;
 }
-

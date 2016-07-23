@@ -72,7 +72,9 @@ set(TASK_SOURCES
         src/tasks/EchoTask.cpp
         src/tasks/StatusTask.cpp
         src/tasks/ScanResonanceTask.cpp
-        src/tasks/GetTask.cpp src/tasks/GetTask.h)
+        src/tasks/UniversalTask.cpp
+        src/tasks/MeasureTask.cpp
+        )
 
 set(TASK_HEADERS
         src/tasks/AbstractTask.h
@@ -81,6 +83,8 @@ set(TASK_HEADERS
         src/tasks/EchoTask.h
         src/tasks/StatusTask.h
         src/tasks/ScanResonanceTask.h
+        src/tasks/UniversalTask.h
+        src/tasks/MeasureTask.h
         )
 
 set(TASK_FILES

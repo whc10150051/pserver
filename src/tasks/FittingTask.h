@@ -7,6 +7,8 @@
 
 
 #include "AbstractTask.h"
+#include "module_formation_signal.h"
+#include "module_of_measurements.h"
 
 class FittingTask : public AbstractTask {
 public:
@@ -15,16 +17,11 @@ public:
     virtual bool run() override;
 
 private:
-    bool _sensIsHi = false;
-    bool _voltIsHi = false;
-    int _channel = 0;
-    int _relay = 0;
-    double _tau = 0;
-    int _l = 0;
-    int _m = 10;
-    int _nStart = 0;
-    int _lPost = 0;
-    int _size = 0;
+    PositionData _position;
+    ParamProbing _paramProbing;
+    PropertySensor _propSensor;
+    ParamProbingSignal _paramSignal;
+    int _sizeOut;
 };
 
 #endif //PSERVER_FITTINGTASK_H

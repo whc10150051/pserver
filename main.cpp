@@ -53,7 +53,7 @@ std::string receive(Poco::Logger& _logger, Poco::Net::StreamSocket& ss) {
         }
     }
     // если большие данные. то не печатать
-    LOG_DEBUG("receive: %s", answer);
+//    LOG_DEBUG("receive: %s", answer);
     LOG_DEBUG("receive size: %d byte", (int) answer.size());
 
     Poco::Timestamp::TimeDiff diff = Poco::Timestamp() - begin;
@@ -142,28 +142,36 @@ int main() {
         Poco::Logger& _logger;
     };
 
-    // опрос статуса
+
+// опрос статуса
+#if 0
+#define STATUS_ENABLE
     Status runnable;
     Poco::Thread threadStatus;
     threadStatus.start(runnable);
+#endif
 
+// запуск задачи по притирке
 #if 0
-    // запуск задачи по притирке
     {
         Poco::Net::SocketAddress sa("localhost", srv.socket().address().port());
         Poco::Net::StreamSocket ss(sa);
         // create task Fitting
         Poco::JSON::Object::Ptr fitting = new Poco::JSON::Object(true);
         fitting->set("task", "fitting");
-        fitting->set("sensishi", 0);
-        fitting->set("voltishi", 0);
         fitting->set("channel", 0);
         fitting->set("relay", 0);
-        fitting->set("tau", 50); // millsec
-        fitting->set("l", 1);
-        fitting->set("m", 10);
+        fitting->set("sensishi", 0);
+        fitting->set("voltishi", 0);
         fitting->set("nstart", 2100);
         fitting->set("lpost", 200000);
+        fitting->set("mode", 1);
+        fitting->set("n", 1);
+        fitting->set("r", 2);
+        fitting->set("m", 10);
+        fitting->set("l", 1);
+        fitting->set("tau", "502.465"); // millsec
+        fitting->set("mfo", "0.0050"); // millsec
         fitting->set("size", 20000);
 
         // send
@@ -179,8 +187,8 @@ int main() {
     Poco::Thread::sleep(10000);
 #endif
 
+// эхо
 #if 0
-    // эхо
     {
     // create task Echo
         Poco::Net::SocketAddress sa("localhost", srv.socket().address().port());
@@ -202,8 +210,8 @@ int main() {
     sleep(1);
 #endif
 
-
-    // запуск задачи по почастотке
+// запуск задачи по почастотке
+#if 1
     {
         Poco::Net::SocketAddress sa("localhost", srv.socket().address().port());
         Poco::Net::StreamSocket ss(sa);
@@ -219,14 +227,22 @@ int main() {
         scan->set("r", 0);
         scan->set("nstart", 2100);
         scan->set("lpost", 200000);
+        size_t pagcSize = 1;
+        Poco::JSON::Array::Ptr pagcArray = new Poco::JSON::Array();
+        for (size_t idx = 0; idx < pagcSize; ++idx) {
+            Poco::JSON::Object::Ptr component = new Poco::JSON::Object(true);
+            pagcArray->add(std::to_string(10));
+        }
+        scan->set("pagc", pagcArray);
+
         scan->set("scansteps", 12);
         // это тест передачи многокомпонентного сигнала
         size_t numComponent = 5;
         Poco::JSON::Array::Ptr componentArray = new Poco::JSON::Array();
         for (size_t idx = 0; idx < numComponent; ++idx) {
             Poco::JSON::Object::Ptr component = new Poco::JSON::Object(true);
-            component->set("m", std::to_string(10));
-            component->set("l", std::to_string(1));
+            component->set("m", 10);
+            component->set("l", 1);
             component->set("tau", std::to_string(50)); // millsec
             component->set("mfo", std::to_string(50));
             componentArray->set(idx, component);
@@ -245,8 +261,54 @@ int main() {
         ss.close();
     }
     Poco::Thread::sleep(10000);
+#endif
+
+// запуск измерения
+#if 1
+    {
+        Poco::Net::SocketAddress sa("localhost", srv.socket().address().port());
+        Poco::Net::StreamSocket ss(sa);
+        // create task MeasureTask
+        Poco::JSON::Object::Ptr measure = new Poco::JSON::Object(true);
+        measure->set("task", "measure");
+        measure->set("relay", 0);
+        measure->set("channel", 0);
+        measure->set("sensishi", 0);
+        measure->set("voltishi", 0);
+        measure->set("mode", 0);
+        measure->set("n", 0);
+        measure->set("r", 0);
+        measure->set("nstart", 2100);
+        measure->set("lpost", 200000);
+        size_t pagcSize = 1;
+        Poco::JSON::Array::Ptr pagcArray = new Poco::JSON::Array();
+        for (size_t idx = 0; idx < pagcSize; ++idx) {
+            Poco::JSON::Object::Ptr component = new Poco::JSON::Object(true);
+            pagcArray->add(std::to_string(10));
+        }
+        measure->set("pagc", pagcArray);
+        measure->set("m", 10);
+        measure->set("l", 1);
+        measure->set("tau", std::to_string(50)); // millsec
+        measure->set("mfo", std::to_string(50));
+        measure->set("typeSignal", "echo");
 
 
+        // send
+        send(_logger, ss, measure);
+
+        // receive
+        receive(_logger, ss);
+
+        Poco::Thread::sleep(100);
+        // close
+        ss.close();
+    }
+    Poco::Thread::sleep(10000);
+#endif
+
+#ifdef STATUS_ENABLE
     threadStatus.join();
+#endif
     return 0;
 }

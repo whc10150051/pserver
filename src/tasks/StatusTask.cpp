@@ -26,6 +26,7 @@ bool StatusTask::run() {
     _answer->set("temp", rnd.next(40));
     _answer->set("DT_CHARGING", 1);
     _answer->set("DT_RECOVERY", 1);
+    _answer->set("state", ""); // строка может передавать состояние какого либо процесса, например номер зондируемой компоненты в почастотке
 
     return true;
 }

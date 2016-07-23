@@ -25,7 +25,15 @@ ScanResonanceTask::ScanResonanceTask(const Poco::JSON::Object::Ptr& config) : Ab
     LOG_DEBUG("n: %d", (int) _paramProbing.n);
     _paramProbing.r = JsonHelper::getIntProperty(config, "r");
     LOG_DEBUG("r: %d", (int) _paramProbing.r);
-//    _paramProbing.pagc
+
+    Poco::JSON::Array::Ptr pagc = JsonHelper::getArrayProperty(config, "pagc");
+    size_t size = pagc->size();
+    for (size_t idx = 0; idx < size; ++idx) {
+        Poco::Dynamic::Var var = pagc->get(idx);
+        _paramProbing.pagc.push_back(std::stod(var.extract<std::string>()));
+    }
+    LOG_DEBUG("page size: %d", (int) _paramProbing.pagc.size());
+
     _position.n_start = JsonHelper::getIntProperty(config, "nstart");
     LOG_DEBUG("nStart: %d", (int) _position.n_start);
     _position.l_post = JsonHelper::getIntProperty(config, "lpost");
@@ -35,14 +43,14 @@ ScanResonanceTask::ScanResonanceTask(const Poco::JSON::Object::Ptr& config) : Ab
 
     // принимаем многокомпонентный сигнал зондирования
     Poco::JSON::Array::Ptr signal = JsonHelper::getArrayProperty(config, "probingsignal");
-    size_t size = signal->size();
+    size = signal->size();
     for (size_t idx = 0; idx < size; ++idx) {
         Poco::Dynamic::Var var = signal->get(idx);
         Poco::JSON::Object::Ptr obj = var.extract<Poco::JSON::Object::Ptr>();
-        double m = std::stod(JsonHelper::getStringProperty(obj, "m"));
-        int l = std::stoi(JsonHelper::getStringProperty(obj, "l"));
-        int tau = std::stoi(JsonHelper::getStringProperty(obj, "tau"));
-        double mfo = std::stod(JsonHelper::getStringProperty(obj, "mfo"));
+        int m = JsonHelper::getIntProperty(obj, "m");
+        int l = JsonHelper::getIntProperty(obj, "l");
+        double tau = std::stod(JsonHelper::getStringProperty(obj, "tau")) * 10E-3;
+        double mfo = std::stod(JsonHelper::getStringProperty(obj, "mfo")) * 10E-3;
         _paramSignals.push_back(ParamProbingSignal(m, l, tau, mfo));
     }
 }
@@ -57,96 +65,79 @@ bool ScanResonanceTask::run() {
 //        "afc": [29.9, 71.5, 106.4, 129.2, 144.0, 176.0, 135.6, 148.5, 16.4, 194.1, 95.6, 54.4]
 //    }
 
-    // проверка на наличие спецфайлов
-    if (common_utils::FileExists(common_const::FILENAME_INTERNAL_SYNCH.c_str())) {
-        LOG_INFO("ACHTUNG!!! INTERNAL_SYNCH Enable");
-    }
-    if (common_utils::FileExists(common_const::FILENAME_CHECKMODE.c_str())) {
-        LOG_INFO("ACHTUNG!!! CHECKMODE Enable");
-    }
+    /*
+     * почастотное зондирование
+     */
+    DBL_VECTOR vAfc;        // значение энергий почастотки
+    double afc_fres = 1;    // afc на резонансной частоте
+    int index_f_res = -1;   // Индекс резонансной частоты в массиве зондирования
+    double x2_max = 0;      // максимальное значение квадрата эхосигнала на рез.частоте
 
-    try {
-        /*
-         * почастотное зондирование
-         */
-        DBL_VECTOR vAfc;       // значение энергий почастотки
-        double afc_fres = 1;    // afc на резонансной частоте
-        int index_f_res = -1;   // Индекс резонансной частоты в массиве зондирования
-        double x2_max = 0;      // максимальное значение квадрата эхосигнала на рез.частоте
-
-        for (int i = 0; i < _scanSteps; ++i) {
-            // суфикс
-            LOG_DEBUG("number probing %d", i);
+    for (int i = 0; i < _scanSteps; ++i) {
+        // суфикс
+        LOG_DEBUG("number probing %d", i);
 #if 0
-            // настройка зондирования
-            Module_of_measurements measure;
-            // !!! пока зондируем однокомпонентным сигналом
-            int ret = measure.Setup(_paramSignals[0], _propSensor);
-            if (ret < 0) {
-                throw Poco::Exception(Poco::format("Setup error: %d", ret));
-            }
+        // настройка зондирования
+        Module_of_measurements measure;
+        // !!! пока зондируем однокомпонентным сигналом
+        int ret = measure.Setup(_paramSignals[0], _propSensor);
+        if (ret < 0) {
+            throw Poco::Exception(Poco::format("Setup error: %d", ret));
+        }
 
-            // запуск измерения
-            ret = measure.Run(_paramProbing);
-            if (ret < 0) {
-                throw Poco::Exception(Poco::format("Run error: %d", ret));
-            }
+        // запуск измерения
+        ret = measure.Run(_paramProbing);
+        if (ret < 0) {
+            throw Poco::Exception(Poco::format("Run error: %d", ret));
+        }
 
-            // Получение модуля СФ-эхосигнала (энергия)
-            MODULE_MF_ECHO mod_data;
-            ret = measure.GetModuleMFEcho(_position, mod_data);
-            if (ret < 0) {
-                throw Poco::Exception(Poco::format("GetSquareMFEcho error: %d", ret));
-            }
+        // Получение модуля СФ-эхосигнала (энергия)
+        MODULE_MF_ECHO mod_data;
+        ret = measure.GetModuleMFEcho(_position, mod_data);
+        if (ret < 0) {
+            throw Poco::Exception(Poco::format("GetSquareMFEcho error: %d", ret));
+        }
 #else
-            Poco::Random rnd;
-            rnd.seed();
-            MODULE_MF_ECHO mod_data;
-            int size = _position.l_post;
-            for (int i = 0; i < size; ++i) {
-                mod_data.push_back(rnd.nextDouble());
-            }
+        Poco::Random rnd;
+        rnd.seed();
+        MODULE_MF_ECHO mod_data;
+        int size = _position.l_post;
+        for (int i = 0; i < size; ++i) {
+            mod_data.push_back(rnd.nextDouble());
+        }
 #endif
 
-            double afc = 0;
+        double afc = 0;
 //            double afc_accumulate = 0;
 //            accumulate(sq_data.begin(), sq_data.end(), afc_accumulate);
-            int size_mod_data = mod_data.size();
-            for (int j = 0; j < size_mod_data; ++j) {
-                afc += mod_data[j];
-            }
-            LOG_DEBUG("afc_%d = %f", i, afc);
-            // добавляем энергию в массив
-            vAfc.push_back(afc);
-            // оценка afc
-            if (afc > afc_fres) {
-                afc_fres = afc;
-                index_f_res = i;
-                x2_max = *max_element(mod_data.begin(), mod_data.end());
-            }
+        int size_mod_data = mod_data.size();
+        for (int j = 0; j < size_mod_data; ++j) {
+            afc += mod_data[j];
         }
-        /*
-         * Сканирование якобы прошло, считываем данные
-         */
-        _answer = new Poco::JSON::Object(true);
-        _answer->set("name", getName());
-        _answer->set("status", "ok");
-        _answer->set("imax", index_f_res);
-        _answer->set("maxafc", x2_max);
-
-        Poco::JSON::Array jsonArray;
-        int size = vAfc.size();
-        for (int i = 0; i < size; ++i) {
-            jsonArray.add(vAfc[i] / afc_fres);
+        LOG_DEBUG("afc_%d = %f", i, afc);
+        // добавляем энергию в массив
+        vAfc.push_back(afc);
+        // оценка afc
+        if (afc > afc_fres) {
+            afc_fres = afc;
+            index_f_res = i;
+            x2_max = *max_element(mod_data.begin(), mod_data.end());
         }
-        _answer->set("afc", jsonArray);
-    } catch (Poco::Exception& ex) {
-        LOG_ERROR(ex.message());
-        _answer = new Poco::JSON::Object(true);
-        _answer->set("name", getName());
-        _answer->set("status", "error");
-        _answer->set("code", ex.displayText());
-        return false;
     }
+    /*
+     * Сканирование якобы прошло, считываем данные
+     */
+    _answer = new Poco::JSON::Object(true);
+    _answer->set("name", getName());
+    _answer->set("status", "ok");
+    _answer->set("imax", index_f_res);
+    _answer->set("maxafc", x2_max);
+
+    Poco::JSON::Array jsonArray;
+    int size = vAfc.size();
+    for (int i = 0; i < size; ++i) {
+        jsonArray.add(vAfc[i] / afc_fres);
+    }
+    _answer->set("afc", jsonArray);
     return true;
 }
