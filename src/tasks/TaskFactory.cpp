@@ -9,6 +9,7 @@
 #include "StatusTask.h"
 #include "ScanResonanceTask.h"
 #include "MeasureTask.h"
+#include "UniversalTask.h"
 
 AbstractTask::Ptr TaskFactory::create(const Poco::JSON::Object::Ptr& config) {
     Poco::Logger& _logger(Poco::Logger::get("TaskFactory"));
@@ -26,6 +27,8 @@ AbstractTask::Ptr TaskFactory::create(const Poco::JSON::Object::Ptr& config) {
         return std::make_shared<ScanResonanceTask>(config);
     } else if (taskStr == "measure") {
         return std::make_shared<MeasureTask>(config);
+    } else if (taskStr == "universal") {
+        return std::make_shared<UniversalTask>(config);
     }
     LOG_DEBUG("Create exeption");
     throw Poco::Exception(Poco::format("TaskFactory: can not create a task name = %s", taskStr));

@@ -19,7 +19,7 @@ void send(Poco::Logger& _logger, Poco::Net::StreamSocket& ss, Poco::JSON::Object
 }
 
 // тупой прием и отображение
-std::string receive(Poco::Logger& _logger, Poco::Net::StreamSocket& ss) {
+std::string receive(Poco::Logger& _logger, Poco::Net::StreamSocket& ss, bool isBig = false) {
     Poco::Timestamp begin;
     Poco::Timespan timeOut(60000,0); // ждем минуту (поместить в константы)
     std::string answer;
@@ -53,7 +53,9 @@ std::string receive(Poco::Logger& _logger, Poco::Net::StreamSocket& ss) {
         }
     }
     // если большие данные. то не печатать
-//    LOG_DEBUG("receive: %s", answer);
+    if (!isBig) {
+        LOG_DEBUG("receive: %s", answer);
+    }
     LOG_DEBUG("receive size: %d byte", (int) answer.size());
 
     Poco::Timestamp::TimeDiff diff = Poco::Timestamp() - begin;
@@ -178,7 +180,7 @@ int main() {
         send(_logger, ss, fitting);
 
         // receive
-        receive(_logger, ss);
+        receive(_logger, ss, true);
 
         Poco::Thread::sleep(100);
         // close
@@ -211,7 +213,7 @@ int main() {
 #endif
 
 // запуск задачи по почастотке
-#if 1
+#if 0
     {
         Poco::Net::SocketAddress sa("localhost", srv.socket().address().port());
         Poco::Net::StreamSocket ss(sa);
@@ -254,7 +256,7 @@ int main() {
         send(_logger, ss, scan);
 
         // receive
-        receive(_logger, ss);
+        receive(_logger, ss, true);
 
         Poco::Thread::sleep(100);
         // close
@@ -264,7 +266,7 @@ int main() {
 #endif
 
 // запуск измерения
-#if 1
+#if 0
     {
         Poco::Net::SocketAddress sa("localhost", srv.socket().address().port());
         Poco::Net::StreamSocket ss(sa);
@@ -295,7 +297,7 @@ int main() {
 
 
         // send
-        send(_logger, ss, measure);
+        send(_logger, ss, measure, true);
 
         // receive
         receive(_logger, ss);
@@ -305,6 +307,34 @@ int main() {
         ss.close();
     }
     Poco::Thread::sleep(10000);
+#endif
+
+// запуск универсальный таск
+#if 0
+    {
+        // create task Task
+        std::vector<std::string> tasks = {"getNumСhannels", "disableMu", "getTemp", "shutdown"};
+        for (auto& name : tasks) {
+            Poco::Net::SocketAddress sa("localhost", srv.socket().address().port());
+            Poco::Net::StreamSocket ss(sa);
+            Poco::JSON::Object::Ptr universal = new Poco::JSON::Object(true);
+            universal->set("task", "universal");
+            universal->set("type", name);
+            if (name == "getTemp") {
+                universal->set("data", "2");
+            }
+
+            // send
+            send(_logger, ss, universal);
+
+            // receive
+            receive(_logger, ss);
+
+            Poco::Thread::sleep(100);
+            // close
+            ss.close();
+        }
+    }
 #endif
 
 #ifdef STATUS_ENABLE

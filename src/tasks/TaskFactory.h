@@ -6,8 +6,8 @@
 #define PSERVER_TASKFACTORY_H
 
 
-#include <Poco/JSON/Object.h>
 #include "AbstractTask.h"
+#include <Poco/JSON/Object.h>
 
 namespace TaskFactory {
     AbstractTask::Ptr create(const Poco::JSON::Object::Ptr& config);
