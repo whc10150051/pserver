@@ -4,8 +4,9 @@
 #pragma once
 
 #include "utils/Logger.h"
+#include <atomic>
+#include <memory>
 #include <Poco/Net/TCPServer.h>
-#include <mutex>
 
 /**
  * Многопоточный сервер, имеет несколько соединений
@@ -20,4 +21,26 @@ public:
 
 private:
     Poco::Logger& _logger;
+};
+
+class Status {
+public:
+
+    static std::string getStatus();
+    static void setStatus(const std::string &_status);
+    static void clear();
+
+protected:
+    static Status* Instance() {
+        if (!_self) {
+            _self = new Status();
+        }
+        return _self;
+    }
+    static Status* _self;
+    Status() {}
+    virtual ~Status() {}
+
+private:
+    std::string _status;
 };

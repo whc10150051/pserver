@@ -1,15 +1,23 @@
-#include <iostream>
-#include <src/Server.h>
-#include <memory>
-#include <ctime>
+#include "Server.h"
+#include "ServerApplication.h"
+#include "Connection.h"
+#include "StringHelper.h"
 #include <Poco/JSON/Object.h>
-#include <src/Connection.h>
 #include <Poco/ConsoleChannel.h>
 #include <Poco/PatternFormatter.h>
 #include <Poco/FormattingChannel.h>
-#include <src/utils/StringHelper.h>
-#include "Poco/Timestamp.h"
+#include <Poco/Timestamp.h>
+#include <Poco/Util/ServerApplication.h>
+#include <memory>
+#include <ctime>
+#include <src/Voltage.h>
+#include <iostream>
+#include <sys/time.h>
+#include <Poco/Random.h>
 
+//POCO_SERVER_MAIN(ServerApplication);
+
+#if 1
 // посылка объекта
 void send(Poco::Logger& _logger, Poco::Net::StreamSocket& ss, Poco::JSON::Object::Ptr object) {
     std::string str = StringHelper::objectToString(object);
@@ -64,51 +72,55 @@ std::string receive(Poco::Logger& _logger, Poco::Net::StreamSocket& ss, bool isB
     return answer;
 }
 
+//#define TEST
+//#define TEST_CONVERT
+
+long timer_msec() {
+    timeval tv;
+    gettimeofday (&tv, NULL);
+    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+
 int main() {
-// запуск как демона будет таким
-//    class Daemon : public ServerApplication
-//    {
-//    public:
-//        Daemon();
-//        /// @Brief The main loop of the daemon, everything must take place here
-//        int main();
-//    };
-//    int Daemon::main()
-//    {
-//        Poco::Net::TCPServerParams* params = new Poco::Net::TCPServerParams();
-//        params->setMaxThreads(4); // в конфиг
-//        params->setMaxQueued(4);// в конфиг
-//        params->setThreadIdleTime(100);// в конфиг
-//
-//        Server(5102, params); // в конфиг
-//        // Wait for CTRL+C
-//        waitForTerminationRequest();
-//        return Application::EXIT_OK;
-//    }
-
-
-    // init log
-    Poco::AutoPtr<Poco::PatternFormatter> formatter(new Poco::PatternFormatter());
-    formatter->setProperty("pattern", "%Y-%m-%d %H:%M:%S %s: [%p] %t");
-    formatter->setProperty("times", "local");
-
-    Poco::AutoPtr<Poco::FormattingChannel> consoleChannel(
-            new Poco::FormattingChannel(formatter, new Poco::ConsoleChannel()));
-
-    Poco::Logger::root().setLevel(Poco::Message::Priority::PRIO_TRACE);
-    Poco::Logger::root().setChannel(consoleChannel);
-
-    Poco::Logger& _logger(Poco::Logger::get("Main"));
-
-    Poco::Net::TCPServerParams* params = new Poco::Net::TCPServerParams();
+    Poco::AutoPtr<Poco::Net::TCPServerParams> params = new Poco::Net::TCPServerParams();
     params->setMaxThreads(4);
     params->setMaxQueued(4);
     params->setThreadIdleTime(100);
 
     Server srv(5102, params);
 
+    Voltage voltage;
+    Poco::Thread threadVoltage;
+    threadVoltage.start(voltage);
+
+#ifdef TEST
+    Poco::Logger& _logger(Poco::Logger::get(""));
+#endif
 
 
+#ifdef TEST_CONVERT
+    Poco::Logger& _logger(Poco::Logger::get(""));
+
+
+    long time = timer_msec();
+    Poco::Random rnd;
+    rnd.seed();
+
+    Poco::JSON::Object::Ptr obj = new Poco::JSON::Object(true);
+    Poco::JSON::Array::Ptr array = new Poco::JSON::Array();
+    for (size_t idx = 0; idx < 250000; ++idx) {
+        Poco::JSON::Object::Ptr component = new Poco::JSON::Object(true);
+        array->add(std::to_string(rnd.next(999999999)));
+    }
+    obj->set("pagc", array);
+
+    LOG_DEBUG("time %d", (int)(timer_msec() - time));
+
+
+#endif
+
+// опрос статуса
+#ifdef TEST
     // Client
     // Эмуляция запуска 2х команд последовательно и постоянного опроса статуса
     class Status: public Poco::Runnable {
@@ -118,7 +130,7 @@ int main() {
 
     private:
         virtual void run() {
-            int n = 10;
+            int n = 1000;
             while (n--) {
                 Poco::Net::SocketAddress sa("localhost", 5102);
                 Poco::Net::StreamSocket ss(sa);
@@ -136,7 +148,7 @@ int main() {
                 // close
                 ss.close();
 
-                Poco::Thread::sleep(1000);
+                Poco::Thread::sleep(100);
             }
         }
 
@@ -144,17 +156,13 @@ int main() {
         Poco::Logger& _logger;
     };
 
-
-// опрос статуса
-#if 0
-#define STATUS_ENABLE
     Status runnable;
     Poco::Thread threadStatus;
     threadStatus.start(runnable);
 #endif
 
 // запуск задачи по притирке
-#if 0
+#ifdef TEST
     {
         Poco::Net::SocketAddress sa("localhost", srv.socket().address().port());
         Poco::Net::StreamSocket ss(sa);
@@ -179,6 +187,8 @@ int main() {
         // send
         send(_logger, ss, fitting);
 
+        Poco::Thread::sleep(2000); //
+
         // receive
         receive(_logger, ss, true);
 
@@ -190,7 +200,7 @@ int main() {
 #endif
 
 // эхо
-#if 0
+#ifdef TEST
     {
     // create task Echo
         Poco::Net::SocketAddress sa("localhost", srv.socket().address().port());
@@ -213,7 +223,7 @@ int main() {
 #endif
 
 // запуск задачи по почастотке
-#if 0
+#ifdef TEST
     {
         Poco::Net::SocketAddress sa("localhost", srv.socket().address().port());
         Poco::Net::StreamSocket ss(sa);
@@ -266,7 +276,7 @@ int main() {
 #endif
 
 // запуск измерения
-#if 0
+#ifdef TEST
     {
         Poco::Net::SocketAddress sa("localhost", srv.socket().address().port());
         Poco::Net::StreamSocket ss(sa);
@@ -289,18 +299,26 @@ int main() {
             pagcArray->add(std::to_string(10));
         }
         measure->set("pagc", pagcArray);
-        measure->set("m", 10);
-        measure->set("l", 1);
-        measure->set("tau", std::to_string(50)); // millsec
-        measure->set("mfo", std::to_string(50));
-        measure->set("typeSignal", "echo");
+        // это тест передачи многокомпонентного сигнала
+        size_t numComponent = 5;
+        Poco::JSON::Array::Ptr componentArray = new Poco::JSON::Array();
+        for (size_t idx = 0; idx < numComponent; ++idx) {
+            Poco::JSON::Object::Ptr component = new Poco::JSON::Object(true);
+            component->set("m", 10);
+            component->set("l", 1);
+            component->set("tau", std::to_string(50)); // millsec
+            component->set("mfo", std::to_string(50));
+            componentArray->set(idx, component);
+        }
+        measure->set("probingsignal", componentArray);
+        measure->set("typeSignal", "env_afc");
 
 
         // send
-        send(_logger, ss, measure, true);
+        send(_logger, ss, measure);
 
         // receive
-        receive(_logger, ss);
+        receive(_logger, ss, true);
 
         Poco::Thread::sleep(100);
         // close
@@ -310,7 +328,7 @@ int main() {
 #endif
 
 // запуск универсальный таск
-#if 0
+#ifdef TEST
     {
         // create task Task
         std::vector<std::string> tasks = {"getNumСhannels", "disableMu", "getTemp", "shutdown"};
@@ -337,8 +355,16 @@ int main() {
     }
 #endif
 
-#ifdef STATUS_ENABLE
+#ifdef TEST
+    threadVoltage.join();
     threadStatus.join();
 #endif
+
+#ifndef TEST
+    while (1);
+#endif
+
     return 0;
 }
+
+#endif // if 0

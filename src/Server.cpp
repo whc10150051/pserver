@@ -55,6 +55,20 @@ void Server::configureLogger() {
         Poco::Logger::root().setLevel(Poco::Message::Priority::PRIO_TRACE);
         Poco::Logger::root().setChannel(splitter);
     } catch (Poco::Exception& ex) {
-        std::cerr << "Server::configureLogger: " << ex.displayText() << std::endl;
+        std::cerr << "Server configure logger failed: " << ex.displayText() << std::endl;
     }
 }
+
+std::string Status::getStatus() {
+    return Instance()->_status;
+}
+
+void Status::setStatus(const std::string& status) {
+    Instance()->_status = status;
+}
+
+void Status::clear() {
+    Status::setStatus("");
+}
+
+Status* Status::_self = nullptr;

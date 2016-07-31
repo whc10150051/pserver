@@ -3,10 +3,12 @@
 //
 
 #include "ScanResonanceTask.h"
-#include "src/utils/JsonHelper.h"
+#include "Server.h"
+#include "JsonHelper.h"
 #include "utils.h"
 #include "const.h"
 #include <Poco/Random.h>
+#include <string>
 
 ScanResonanceTask::ScanResonanceTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(config, "ScanResonanceTask") {
     LOG_DEBUG("Begin ScanResonanceTask");
@@ -30,7 +32,7 @@ ScanResonanceTask::ScanResonanceTask(const Poco::JSON::Object::Ptr& config) : Ab
     size_t size = pagc->size();
     for (size_t idx = 0; idx < size; ++idx) {
         Poco::Dynamic::Var var = pagc->get(idx);
-        _paramProbing.pagc.push_back(std::stod(var.extract<std::string>()));
+        _paramProbing.pagc.push_back(Poco::NumberParser::parseFloat(var.extract<std::string>()));
     }
     LOG_DEBUG("page size: %d", (int) _paramProbing.pagc.size());
 
@@ -38,19 +40,18 @@ ScanResonanceTask::ScanResonanceTask(const Poco::JSON::Object::Ptr& config) : Ab
     LOG_DEBUG("nStart: %d", (int) _position.n_start);
     _position.l_post = JsonHelper::getIntProperty(config, "lpost");
     LOG_DEBUG("lPost: %d", (int) _position.l_post);
-    _scanSteps = JsonHelper::getIntProperty(config, "scansteps");
-    LOG_DEBUG("scansteps: %d", (int) _scanSteps);
 
     // принимаем многокомпонентный сигнал зондирования
     Poco::JSON::Array::Ptr signal = JsonHelper::getArrayProperty(config, "probingsignal");
-    size = signal->size();
-    for (size_t idx = 0; idx < size; ++idx) {
+    _scanSteps = signal->size();
+    LOG_DEBUG("num steps: %d", _scanSteps);
+    for (int idx = 0; idx < _scanSteps; ++idx) {
         Poco::Dynamic::Var var = signal->get(idx);
         Poco::JSON::Object::Ptr obj = var.extract<Poco::JSON::Object::Ptr>();
         int m = JsonHelper::getIntProperty(obj, "m");
         int l = JsonHelper::getIntProperty(obj, "l");
-        double tau = std::stod(JsonHelper::getStringProperty(obj, "tau")) * 10E-3;
-        double mfo = std::stod(JsonHelper::getStringProperty(obj, "mfo")) * 10E-3;
+        double tau = Poco::NumberParser::parseFloat(JsonHelper::getStringProperty(obj, "tau"));  // секунды
+        double mfo = Poco::NumberParser::parseFloat(JsonHelper::getStringProperty(obj, "mfo"));  // секунды
         _paramSignals.push_back(ParamProbingSignal(m, l, tau, mfo));
     }
 }
@@ -73,10 +74,11 @@ bool ScanResonanceTask::run() {
     int index_f_res = -1;   // Индекс резонансной частоты в массиве зондирования
     double x2_max = 0;      // максимальное значение квадрата эхосигнала на рез.частоте
 
-    for (int i = 0; i < _scanSteps; ++i) {
+    for (int step = 0; step < _scanSteps; ++step) {
         // суфикс
-        LOG_DEBUG("number probing %d", i);
-#if 0
+        LOG_DEBUG("number probing %d", step);
+        Status::setStatus("scan " + std::to_string(step));
+#if 1
         // настройка зондирования
         Module_of_measurements measure;
         // !!! пока зондируем однокомпонентным сигналом
@@ -105,6 +107,7 @@ bool ScanResonanceTask::run() {
         for (int i = 0; i < size; ++i) {
             mod_data.push_back(rnd.nextDouble());
         }
+        Poco::Thread::sleep(1000);
 #endif
 
         double afc = 0;
@@ -114,16 +117,17 @@ bool ScanResonanceTask::run() {
         for (int j = 0; j < size_mod_data; ++j) {
             afc += mod_data[j];
         }
-        LOG_DEBUG("afc_%d = %f", i, afc);
+        LOG_DEBUG("afc_%d = %f", step, afc);
         // добавляем энергию в массив
         vAfc.push_back(afc);
         // оценка afc
         if (afc > afc_fres) {
             afc_fres = afc;
-            index_f_res = i;
+            index_f_res = step;
             x2_max = *max_element(mod_data.begin(), mod_data.end());
         }
     }
+    Status::clear();
     /*
      * Сканирование якобы прошло, считываем данные
      */
@@ -131,7 +135,8 @@ bool ScanResonanceTask::run() {
     _answer->set("name", getName());
     _answer->set("status", "ok");
     _answer->set("imax", index_f_res);
-    _answer->set("maxafc", x2_max);
+    _answer->set("maxafc", afc_fres);
+    _answer->set("max2", x2_max);
 
     Poco::JSON::Array jsonArray;
     int size = vAfc.size();

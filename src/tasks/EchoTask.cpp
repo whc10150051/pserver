@@ -24,3 +24,7 @@ bool EchoTask::run() {
 
     return true;
 }
+
+EchoTask::~EchoTask() {
+    LOG_DEBUG("End EchoTask");
+}

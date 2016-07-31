@@ -8,6 +8,8 @@
 #include "module_of_measurements.h"
 #include <Poco/Random.h>
 #include <Poco/Exception.h>
+#include <string>
+#include <cstdio>
 
 FittingTask::FittingTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(config, "FittingTask") {
     LOG_DEBUG("Begin FittingTask");
@@ -36,9 +38,13 @@ FittingTask::FittingTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(c
     LOG_DEBUG("m: %d", m);
     int l = JsonHelper::getIntProperty(config, "l");
     LOG_DEBUG("l: %d", l);
-    double tau = std::stod(JsonHelper::getStringProperty(config, "tau")) * 10E-3;
+    std::string tauStr = JsonHelper::getStringProperty(config, "tau");
+    LOG_DEBUG("tauStr: %s", tauStr);
+    double tau = std::stod(tauStr.c_str());
     LOG_DEBUG("tau: %f", tau);
-    double mfo = std::stod(JsonHelper::getStringProperty(config, "mfo")) * 10E-3;
+    std::string mfoStr = JsonHelper::getStringProperty(config, "mfo");
+    LOG_DEBUG("mfoStr: %s", mfoStr);
+    double mfo = std::stod(mfoStr.c_str());
     LOG_DEBUG("mfo: %f", mfo);
 
     _paramSignal = ParamProbingSignal(m, l, tau, mfo);
@@ -79,21 +85,24 @@ bool FittingTask::run() {
 //        "data": [29.9, 71.5, 106.4, 129.2, 144.0, 176.0, 135.6, 148.5, 16.4, 194.1, 95.6, 54.4]
 //    }
 
-#if 1
+#if 0
     // временная реализация без железа
     Poco::Random rnd;
     rnd.seed();
-    std::vector<int> array;
-    for (int i = 0; i < 250000; ++i) {
+    std::vector<double> array;
+    for (int i = 0; i < (int)_position.l_post; ++i) {
         array.push_back(rnd.next());
     }
+
+    DBL_VECTOR data_out;
+    smoof(array, data_out, _sizeOut);
 
     _answer = new Poco::JSON::Object(true);
     _answer->set("name", getName());
     _answer->set("status", "ok");
 
     Poco::JSON::Array jsonArray;
-    for (auto& item : array) {
+    for (auto& item : data_out) {
         jsonArray.add(item);
     }
     _answer->set("data", jsonArray);

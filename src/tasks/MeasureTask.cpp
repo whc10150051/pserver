@@ -9,6 +9,8 @@
 #include "utils.h"
 #include "const.h"
 #include <Poco/Random.h>
+#include <string>
+#include <numeric>
 
 MeasureTask::MeasureTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(config, "MeasureTask") {
     LOG_DEBUG("Begin MeasureTask");
@@ -35,19 +37,25 @@ MeasureTask::MeasureTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(c
     size_t size = pagc->size();
     for (size_t idx = 0; idx < size; ++idx) {
         Poco::Dynamic::Var var = pagc->get(idx);
-        _paramProbing.pagc.push_back(std::stod(var.extract<std::string>()));
+        _paramProbing.pagc.push_back(Poco::NumberParser::parseFloat(var.extract<std::string>()));
     }
     LOG_DEBUG("page size: %d", (int) _paramProbing.pagc.size());
 
-    int m = JsonHelper::getIntProperty(config, "m");
-    LOG_DEBUG("m: %d", m);
-    int l = JsonHelper::getIntProperty(config, "l");
-    LOG_DEBUG("l: %d", l);
-    double tau = std::stod(JsonHelper::getStringProperty(config, "tau")) * 10E-3; // миллисекунды
-    LOG_DEBUG("tau: %f", tau);
-    double mfo = std::stod(JsonHelper::getStringProperty(config, "mfo")) * 10E-3;
-    LOG_DEBUG("mfo: %f", mfo);
-    _paramSignal = ParamProbingSignal(m, l, tau, mfo);
+// принимаем многокомпонентный сигнал зондирования
+    Poco::JSON::Array::Ptr signal = JsonHelper::getArrayProperty(config, "probingsignal");
+    size = signal->size();
+    LOG_DEBUG("num steps: %d", (int) size);
+    std::vector<ParamProbingSignal> _paramSignals;
+    for (size_t idx = 0; idx < size; ++idx) {
+        Poco::Dynamic::Var var = signal->get(idx);
+        Poco::JSON::Object::Ptr obj = var.extract<Poco::JSON::Object::Ptr>();
+        int m = JsonHelper::getIntProperty(obj, "m");
+        int l = JsonHelper::getIntProperty(obj, "l");
+        double tau = Poco::NumberParser::parseFloat(JsonHelper::getStringProperty(obj, "tau"));  // секунды
+        double mfo = Poco::NumberParser::parseFloat(JsonHelper::getStringProperty(obj, "mfo"));  // секунды
+        _paramSignals.push_back(ParamProbingSignal(m, l, tau, mfo));
+    }
+    _paramSignal = _paramSignals[0];
     _typeSignal = JsonHelper::getStringProperty(config, "typeSignal");
 }
 
@@ -59,9 +67,10 @@ bool MeasureTask::run() {
 //        "data": [29.9, 71.5, 106.4, 129.2, 144.0, 176.0, 135.6, 148.5, 16.4, 194.1, 95.6, 54.4]
 //    }
 //
-#if 1
+#if 0
     // временная реализация без железа
     Poco::Random rnd;
+    double acc = 1000;
     rnd.seed();
     std::vector<int> array;
     for (int i = 0; i < 250000; ++i) {
@@ -94,6 +103,7 @@ bool MeasureTask::run() {
         throw Poco::Exception(Poco::format("Error start measure: %d", ret));
     }
     LOG_DEBUG("Get signal");
+    double acc = 0;
     DBL_VECTOR data_measure;
     if (_typeSignal == "echo") {
         ret = measure.GetMFEcho(_position, data_measure);
@@ -101,10 +111,16 @@ bool MeasureTask::run() {
         ret = measure.GetEnvMFEcho(_position, data_measure);
     } else if (_typeSignal == "square") {
         ret = measure.GetSquareMFEcho(_position, data_measure);
-    } else if (_typeSignal == "module") {
-        ret = measure.GetModuleMFEcho(_position, data_measure);
-    } else if (_typeSignal == "att") {
-        ret = measure.GetAttMFEcho(_position, data_measure);
+    } else if (_typeSignal == "env_afc") {
+        ret = measure.GetSquareMFEcho(_position, data_measure);
+        if (ret >= 0) {
+            ret = measure.GetEnvMFEcho(_position, data_measure);
+            std::accumulate(data_measure.begin(), data_measure.end(), acc);
+        }
+//    } else if (_typeSignal == "module") {
+//        ret = measure.GetModuleMFEcho(_position, data_measure);
+//    } else if (_typeSignal == "att") {
+//        ret = measure.GetAttMFEcho(_position, data_measure);
     }
     if (ret < 0) {
         throw Poco::Exception(Poco::format("Error get signal (%s) measure: %d", _typeSignal, ret));
@@ -121,5 +137,8 @@ bool MeasureTask::run() {
     }
     _answer->set("data", jsonArray);
 #endif
+    if (_typeSignal == "env_afc") {
+        _answer->set("afc", std::to_string(acc));
+    }
     return true;
 }

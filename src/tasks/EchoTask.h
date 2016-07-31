@@ -11,6 +11,8 @@ class EchoTask : public AbstractTask {
 public:
     EchoTask(const Poco::JSON::Object::Ptr& config);
 
+    virtual ~EchoTask();
+
     virtual bool run() override;
 
 private:

@@ -10,9 +10,20 @@ set(CMAKE_CONFIGURATION_TYPES Debug Release CACHE TYPE INTERNAL FORCE )
 
 project(pserver)
 
+############# toolchin #########################################################
+set(CMAKE_C_COMPILER   /opt/encotes/bin/arm-linux-gnueabihf-gcc)
+set(CMAKE_CXX_COMPILER /opt/encotes/bin/arm-linux-gnueabihf-g++)
+set(CMAKE_STRIP /opt/encotes/bin/arm-linux-gnueabihf-strip)
+
+############# definitions#######################################################
+#add_definitions(-std=c++11 -O2 -march=armv7-a -mtune=cortex-a8 -ftree-vectorize -mfpu=vfp -mfloat-abi=soft)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -march=armv7-a -mtune=cortex-a8 -mfloat-abi=hard -mfpu=neon")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -march=armv7-a -mtune=cortex-a8 -mfloat-abi=hard -mfpu=neon")
+
+############# modules #########################################################
 add_subdirectory(src/modules)
 
-set(PROJECT_LIB_DIR /opt/encotes_64/lib)
+set(PROJECT_LIB_DIR /opt/encotes/lib)
 
 ############# RPATH ############################################################
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
@@ -27,16 +38,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/CMakeModules)
 
 # Find POCO
 find_package(Poco COMPONENTS Foundation JSON Net Util XML REQUIRED)
-
-# definitions
-if (UNIX)
-    add_definitions(-std=c++14)
-endif (UNIX)
-
-############# toolchin #########################################################
-#set(CMAKE_C_COMPILER   /opt/encotes/bin/arm-linux-gnueabihf-gcc)
-#set(CMAKE_CXX_COMPILER /opt/encotes/bin/arm-linux-gnueabihf-g++)
-#set(CMAKE_STRIP /opt/encotes/bin/arm-linux-gnueabihf-strip)
 
 ############# Common build output dir ##########################################
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
@@ -56,6 +57,7 @@ set(SOURCES
         main.cpp
         src/Server.cpp
         src/Connection.cpp
+        src/Voltage.cpp
         )
 
 set(HEADERS
@@ -63,6 +65,23 @@ set(HEADERS
         src/utils/Logger.h
         src/Const.h
         src/Connection.h
+        src/Voltage.h
+        src/utils/ProductInfo.h
+        )
+
+set(SERVICE_SOURCES
+        src/service/ServerApplication.cpp
+        src/service/ServiceName.cpp
+        )
+
+set(SERVICE_HEADERS
+        src/service/ServerApplication.h
+        src/service/ServiceName.h
+        )
+
+set(SERVICE_FILES
+        ${SERVICE_SOURCES}
+        ${SERVICE_HEADERS}
         )
 
 set(TASK_SOURCES
@@ -102,6 +121,7 @@ set(UTIL_HEADERS
         src/utils/JsonHelper.h
         src/utils/LogConfiguration.h
         src/utils/StringHelper.h
+        src/utils/ProductInfo.h
         )
 
 set(UTIL_FILES
@@ -114,17 +134,20 @@ set(ALL_SOURCES
         ${HEADERS}
         ${UTIL_FILES}
         ${TASK_FILES}
+        ${SERVICE_FILES}
         )
 
 source_group("Source Files" FILES ${SOURCES})
 source_group("Header Files" FILES ${HEADERS})
 source_group("Util Files" FILES ${UTIL_FILES})
 source_group("Task Files" FILES ${TASK_FILES})
+source_group("Service Files" FILES ${SERVICE_FILES})
 
 ############# Compiler includes ################################################
 include_directories(${PROJECT_SOURCE_DIR}/)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/src/utils)
+include_directories(${PROJECT_SOURCE_DIR}/src/service)
 include_directories(${POCO_INCLUDE_DIRS})
 
 include_directories(src/modules/common)

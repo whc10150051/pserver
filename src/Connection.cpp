@@ -35,7 +35,7 @@ void Connection::run() {
             Poco::JSON::Object::Ptr answer = new Poco::JSON::Object(true);
             answer->set("name", name);
             answer->set("status", "error");
-            answer->set("code", ex.displayText());
+            answer->set("couse", ex.displayText());
             send(StringHelper::objectToString(answer));
         } catch (Poco::Exception &ex_) {
             LOG_ERROR("Can not send error answer from Connection::run() : %s ( error answer: %s)",
@@ -49,7 +49,7 @@ void Connection::run() {
             Poco::JSON::Object::Ptr answer = new Poco::JSON::Object(true);
             answer->set("name", name);
             answer->set("status", "error");
-            answer->set("code", error);
+            answer->set("couse", error);
             send(StringHelper::objectToString(answer));
         } catch (Poco::Exception &ex_) {
             LOG_ERROR("Can not send error answer from Connection::run() : %s ( error answer: %s)",
@@ -65,12 +65,12 @@ void Connection::send(const std::string& text) {
     int n = text.size();
     LOG_DEBUG("size answer: %d byte", n);
     const char* answer = text.c_str();
-//                LOG_DEBUG("answer: %s", answer);
+//                LOG_DEBUG("answer: %s", std::string(answer));
 
     while (n > 0) {
-        ss.sendBytes(answer, n);
-        n = ss.receiveBytes((void*)answer, sizeof(answer));
+        n -= ss.sendBytes(answer, n);
     }
+    LOG_DEBUG("End sending");
 }
 
 std::string Connection::receive() {
