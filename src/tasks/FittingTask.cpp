@@ -10,6 +10,7 @@
 #include <Poco/Exception.h>
 #include <string>
 #include <cstdio>
+#include <src/utils/StringHelper.h>
 
 FittingTask::FittingTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(config, "FittingTask") {
     LOG_DEBUG("Begin FittingTask");
@@ -40,14 +41,14 @@ FittingTask::FittingTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(c
     LOG_DEBUG("l: %d", l);
     std::string tauStr = JsonHelper::getStringProperty(config, "tau");
     LOG_DEBUG("tauStr: %s", tauStr);
-    double tau = std::stod(tauStr.c_str());
-    LOG_DEBUG("tau: %f", tau);
+    double tau = std::stof(tauStr);
+    LOG_DEBUG("tau: %E", tau);
     std::string mfoStr = JsonHelper::getStringProperty(config, "mfo");
     LOG_DEBUG("mfoStr: %s", mfoStr);
-    double mfo = std::stod(mfoStr.c_str());
-    LOG_DEBUG("mfo: %f", mfo);
+    double mfo = std::stof(mfoStr);
+    LOG_DEBUG("mfo: %E", mfo);
 
-    _paramSignal = ParamProbingSignal(m, l, tau, mfo);
+    _paramSignal = ParamProbingSignal(tau, l, m, mfo);
 
     _sizeOut = JsonHelper::getIntProperty(config, "size");
     LOG_DEBUG("size: %d", _sizeOut);

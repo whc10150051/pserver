@@ -41,6 +41,19 @@ void Connection::run() {
             LOG_ERROR("Can not send error answer from Connection::run() : %s ( error answer: %s)",
                       ex_.displayText(), ex.displayText());
         }
+    }  catch (std::exception& ex) {
+        LOG_ERROR("task: %s run: %s", name, ex.what());
+
+        try {
+            Poco::JSON::Object::Ptr answer = new Poco::JSON::Object(true);
+            answer->set("name", name);
+            answer->set("status", "error");
+            answer->set("couse", ex.what());
+            send(StringHelper::objectToString(answer));
+        } catch (Poco::Exception &ex_) {
+            LOG_ERROR("Can not send error answer from Connection::run() : %s ( error answer: %s)",
+                      ex_.displayText(), ex.what());
+        }
     } catch (...) {
         std::string error = "Unknown error";
         LOG_ERROR("task: %s run: %s", name, error);

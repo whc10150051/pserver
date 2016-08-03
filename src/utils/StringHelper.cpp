@@ -10,6 +10,7 @@
 #include <Poco/UTF16Encoding.h>
 #include <Poco/UTF8Encoding.h>
 #include <Poco/TextConverter.h>
+#include <iomanip>
 
 std::vector<std::string> StringHelper::tokenize(const std::string& s, const std::string& separators) {
     std::vector<std::string> result;

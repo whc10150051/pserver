@@ -17,8 +17,12 @@ set(CMAKE_STRIP /opt/encotes/bin/arm-linux-gnueabihf-strip)
 
 ############# definitions#######################################################
 #add_definitions(-std=c++11 -O2 -march=armv7-a -mtune=cortex-a8 -ftree-vectorize -mfpu=vfp -mfloat-abi=soft)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -march=armv7-a -mtune=cortex-a8 -mfloat-abi=hard -mfpu=neon")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -march=armv7-a -mtune=cortex-a8 -mfloat-abi=hard -mfpu=neon")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -march=armv7-a -mtune=cortex-a8 -mfloat-abi=soft")
+#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -march=armv7-a -mtune=cortex-a8 -mfloat-abi=soft")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -march=armv7-a -mtune=cortex-a8 -mfpu=neon -ftree-vectorize -ffast-math")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -march=armv7-a -mtune=cortex-a8 -mfpu=neon -ftree-vectorize -ffast-math")
 
 ############# modules #########################################################
 add_subdirectory(src/modules)

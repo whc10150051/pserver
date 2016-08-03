@@ -52,7 +52,7 @@ ScanResonanceTask::ScanResonanceTask(const Poco::JSON::Object::Ptr& config) : Ab
         int l = JsonHelper::getIntProperty(obj, "l");
         double tau = Poco::NumberParser::parseFloat(JsonHelper::getStringProperty(obj, "tau"));  // секунды
         double mfo = Poco::NumberParser::parseFloat(JsonHelper::getStringProperty(obj, "mfo"));  // секунды
-        _paramSignals.push_back(ParamProbingSignal(m, l, tau, mfo));
+        _paramSignals.push_back(ParamProbingSignal(tau, l, m, mfo));
     }
 }
 
@@ -73,6 +73,8 @@ bool ScanResonanceTask::run() {
     double afc_fres = 1;    // afc на резонансной частоте
     int index_f_res = -1;   // Индекс резонансной частоты в массиве зондирования
     double x2_max = 0;      // максимальное значение квадрата эхосигнала на рез.частоте
+    int tryMeasure = 3;
+    int ret = -1000;
 
     for (int step = 0; step < _scanSteps; ++step) {
         // суфикс
@@ -82,21 +84,46 @@ bool ScanResonanceTask::run() {
         // настройка зондирования
         Module_of_measurements measure;
         // !!! пока зондируем однокомпонентным сигналом
-        int ret = measure.Setup(_paramSignals[0], _propSensor);
-        if (ret < 0) {
+        tryMeasure = 3;
+        do {
+            try {
+                ret = measure.Setup(_paramSignals[0], _propSensor);
+            } catch (...) {
+                tryMeasure--;
+            }
+        } while (tryMeasure && ret != ME_OK);
+
+        if (ret != ME_OK) {
+            //TODO сюда воткнуть расшифровку ошибки std::map
             throw Poco::Exception(Poco::format("Setup error: %d", ret));
         }
 
         // запуск измерения
-        ret = measure.Run(_paramProbing);
-        if (ret < 0) {
+        tryMeasure = 3;
+        do {
+            try {
+                ret = measure.Run(_paramProbing);
+            } catch (...) {
+                tryMeasure--;
+            }
+        } while (tryMeasure && ret != ME_OK);
+
+        if (ret != ME_OK) {
             throw Poco::Exception(Poco::format("Run error: %d", ret));
         }
 
         // Получение модуля СФ-эхосигнала (энергия)
+        tryMeasure = 3;
         MODULE_MF_ECHO mod_data;
-        ret = measure.GetModuleMFEcho(_position, mod_data);
-        if (ret < 0) {
+        do {
+            try {
+                ret = measure.GetModuleMFEcho(_position, mod_data);
+            } catch (...) {
+                tryMeasure--;
+            }
+        } while (tryMeasure && ret != ME_OK);
+
+        if (ret != ME_OK) {
             throw Poco::Exception(Poco::format("GetSquareMFEcho error: %d", ret));
         }
 #else

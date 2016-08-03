@@ -53,7 +53,7 @@ MeasureTask::MeasureTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(c
         int l = JsonHelper::getIntProperty(obj, "l");
         double tau = Poco::NumberParser::parseFloat(JsonHelper::getStringProperty(obj, "tau"));  // секунды
         double mfo = Poco::NumberParser::parseFloat(JsonHelper::getStringProperty(obj, "mfo"));  // секунды
-        _paramSignals.push_back(ParamProbingSignal(m, l, tau, mfo));
+        _paramSignals.push_back(ParamProbingSignal(tau, l, m, mfo));
     }
     _paramSignal = _paramSignals[0];
     _typeSignal = JsonHelper::getStringProperty(config, "typeSignal");
