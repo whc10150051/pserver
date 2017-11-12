@@ -27,7 +27,7 @@ void Voltage::run() {
                 /*
                  * файла нет и возвращает единичный коэффициент
                  */
-                LOG_ERROR("File %s not found. Calibration factor set by default", ADC_CONF_STR);
+                LOG_WARNING("File %s not found. Calibration factor set by default", ADC_CONF_STR);
             }
 
             // читаем значение АЦП
@@ -43,9 +43,9 @@ void Voltage::run() {
                 adc = 0;
             }
 #endif
-            _voltage = adc * adc_config;
+            _voltage.store(adc * adc_config);
             LOG_DEBUG("End loop measuring voltage");
-            Poco::Thread::sleep(10000);
+            Poco::Thread::sleep(60000);
         } catch (...) {
             LOG_ERROR("Error in loop measuring voltage");
         }

@@ -6,9 +6,9 @@
 #include "tasks/TaskFactory.h"
 #include "JsonHelper.h"
 #include "Server.h"
+#include "StringHelper.h"
 #include <Poco/JSON/Object.h>
 #include <Poco/JSON/Parser.h>
-#include <src/utils/StringHelper.h>
 
 void Connection::run() {
     LOG_DEBUG("Begin connection");
@@ -28,45 +28,46 @@ void Connection::run() {
         } else {
             LOG_ERROR("request is empty");
         }
+//        sleep(1);
     } catch (Poco::Exception& ex) {
-        LOG_ERROR("task: %s run: %s", name, ex.displayText());
+        LOG_ERROR("task: %s run: %s", name, ex.message());
 
         try {
             Poco::JSON::Object::Ptr answer = new Poco::JSON::Object(true);
             answer->set("name", name);
             answer->set("status", "error");
-            answer->set("couse", ex.displayText());
+            answer->set("cause", ex.message());
             send(StringHelper::objectToString(answer));
         } catch (Poco::Exception &ex_) {
             LOG_ERROR("Can not send error answer from Connection::run() : %s ( error answer: %s)",
-                      ex_.displayText(), ex.displayText());
+                      ex_.message(), ex.message());
         }
     }  catch (std::exception& ex) {
-        LOG_ERROR("task: %s run: %s", name, ex.what());
+        LOG_ERROR("task: %s run: %s", name, std::string(ex.what()));
 
         try {
             Poco::JSON::Object::Ptr answer = new Poco::JSON::Object(true);
             answer->set("name", name);
             answer->set("status", "error");
-            answer->set("couse", ex.what());
+            answer->set("cause", ex.what());
             send(StringHelper::objectToString(answer));
         } catch (Poco::Exception &ex_) {
             LOG_ERROR("Can not send error answer from Connection::run() : %s ( error answer: %s)",
-                      ex_.displayText(), ex.what());
+                      ex_.message(), std::string(ex.what()));
         }
     } catch (...) {
-        std::string error = "Unknown error";
+        std::string error = "Неизвестная ошибка";
         LOG_ERROR("task: %s run: %s", name, error);
 
         try {
             Poco::JSON::Object::Ptr answer = new Poco::JSON::Object(true);
             answer->set("name", name);
             answer->set("status", "error");
-            answer->set("couse", error);
+            answer->set("cause", error);
             send(StringHelper::objectToString(answer));
         } catch (Poco::Exception &ex_) {
             LOG_ERROR("Can not send error answer from Connection::run() : %s ( error answer: %s)",
-                      ex_.displayText(), error);
+                      ex_.message(), error);
         }
     }
     LOG_DEBUG("End connection");
@@ -75,10 +76,12 @@ void Connection::run() {
 void Connection::send(const std::string& text) {
     std::lock_guard<std::mutex> lock(_sendMutex);
     Poco::Net::StreamSocket& ss = socket();
-    int n = text.size();
+    int n = (int) text.size();
     LOG_DEBUG("size answer: %d byte", n);
     const char* answer = text.c_str();
-//                LOG_DEBUG("answer: %s", std::string(answer));
+    int maxSizeText = 100;
+    auto end = (text.end() - text.begin()) > maxSizeText ? (text.begin() + maxSizeText) : text.end();
+    LOG_DEBUG("answer: %s", std::string(text.begin(), end));
 
     while (n > 0) {
         n -= ss.sendBytes(answer, n);
@@ -96,7 +99,7 @@ std::string Connection::receive() {
         LOG_DEBUG("TIMEOUT! %d ms - exit", timeOut.milliseconds());
     } else {
         while (ss.available() > 0) {
-            char buffer[1024] = {0};
+            char buffer[BUFSIZ] = {0};
             int n = ss.receiveBytes(buffer, sizeof(buffer));
             request += std::string(buffer, n);
         }

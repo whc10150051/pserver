@@ -51,8 +51,11 @@ MeasureTask::MeasureTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(c
         Poco::JSON::Object::Ptr obj = var.extract<Poco::JSON::Object::Ptr>();
         int m = JsonHelper::getIntProperty(obj, "m");
         int l = JsonHelper::getIntProperty(obj, "l");
-        double tau = Poco::NumberParser::parseFloat(JsonHelper::getStringProperty(obj, "tau"));  // секунды
-        double mfo = Poco::NumberParser::parseFloat(JsonHelper::getStringProperty(obj, "mfo"));  // секунды
+        std::string tauStr = JsonHelper::getStringProperty(obj, "tau");  // секунды
+        double tau = std::stof(tauStr);
+        std::string mfoStr = JsonHelper::getStringProperty(obj, "mfo");  // секунды
+        double mfo = std::stof(mfoStr);
+        LOG_DEBUG("m: %d l: %d tau: %E mfo: %E", m, l, tau, mfo);
         _paramSignals.push_back(ParamProbingSignal(tau, l, m, mfo));
     }
     _paramSignal = _paramSignals[0];
@@ -91,40 +94,59 @@ bool MeasureTask::run() {
 //    Poco::Thread::sleep(1000);
 #else
     // настройка зондирования
-    LOG_DEBUG("Setup");
-    Module_of_measurements measure;
-    int ret = measure.Setup(_paramSignal, _propSensor);
-    if (ret < 0) {
-        throw Poco::Exception(Poco::format("Error setup measure: %d", ret));
-    }
-    LOG_DEBUG("Run");
-    ret = measure.Run(_paramProbing);
-    if (ret < 0) {
-        throw Poco::Exception(Poco::format("Error start measure: %d", ret));
-    }
-    LOG_DEBUG("Get signal");
-    double acc = 0;
-    DBL_VECTOR data_measure;
-    if (_typeSignal == "echo") {
-        ret = measure.GetMFEcho(_position, data_measure);
-    } else if (_typeSignal == "env") {
-        ret = measure.GetEnvMFEcho(_position, data_measure);
-    } else if (_typeSignal == "square") {
-        ret = measure.GetSquareMFEcho(_position, data_measure);
-    } else if (_typeSignal == "env_afc") {
-        ret = measure.GetSquareMFEcho(_position, data_measure);
-        if (ret >= 0) {
-            ret = measure.GetEnvMFEcho(_position, data_measure);
-            std::accumulate(data_measure.begin(), data_measure.end(), acc);
+    auto measuring = [&](DBL_VECTOR& data_measure, double& acc) {
+        int ret;
+        LOG_DEBUG("Setup measure");
+        Module_of_measurements measure;
+        ret = measure.Setup(_paramSignal, _propSensor);
+        if (ret < 0) {
+            return ret;
         }
-//    } else if (_typeSignal == "module") {
-//        ret = measure.GetModuleMFEcho(_position, data_measure);
-//    } else if (_typeSignal == "att") {
-//        ret = measure.GetAttMFEcho(_position, data_measure);
-    }
-    if (ret < 0) {
-        throw Poco::Exception(Poco::format("Error get signal (%s) measure: %d", _typeSignal, ret));
-    }
+        LOG_DEBUG("Run");
+        ret = measure.Run(_paramProbing);
+        if (ret < 0) {
+            return ret;
+        }
+        LOG_DEBUG("Get signal");
+        if (_typeSignal == "echo") {
+            ret = measure.GetMFEcho(_position, data_measure);
+        } else if (_typeSignal == "env") {
+            ret = measure.GetEnvMFEcho(_position, data_measure);
+        } else if (_typeSignal == "square") {
+            ret = measure.GetSquareMFEcho(_position, data_measure);
+        } else if (_typeSignal == "env_afc") {
+            ret = measure.GetEnvMFEcho(_position, data_measure);
+            if (ret >= 0) {
+                DBL_VECTOR dataAfc;
+                ret = measure.GetModuleMFEcho(_position, dataAfc);
+                std::accumulate(dataAfc.begin(), dataAfc.end(), acc);
+            }
+        } else if (_typeSignal == "module") {
+            ret = measure.GetModuleMFEcho(_position, data_measure);
+        } else if (_typeSignal == "att") {
+            ret = measure.GetAttMFEcho(_position, data_measure);
+        }
+        return ret;
+    };
+
+    double acc = 0.;
+    DBL_VECTOR dataMeasure;
+    int numTry = 5;
+    do {
+        LOG_DEBUG("Num try measuring = %d", numTry);
+        int ret = measuring(dataMeasure, acc);
+        if (ret < 0) {
+            if (!--numTry) {
+                throw Poco::Exception(Module_of_measurements::getMessageError(ret));
+            } else {
+                // можно чуть подождать перед следующим разом
+                LOG_DEBUG("Wait 100 ms", numTry);
+                Poco::Thread::sleep(100);
+            }
+        } else {
+            numTry = 0;
+        }
+    } while (numTry);
 
     LOG_DEBUG("Create answer");
     _answer = new Poco::JSON::Object(true);
@@ -132,7 +154,7 @@ bool MeasureTask::run() {
     _answer->set("status", "ok");
 
     Poco::JSON::Array jsonArray;
-    for (auto& item : data_measure) {
+    for (auto& item : dataMeasure) {
         jsonArray.add(item);
     }
     _answer->set("data", jsonArray);

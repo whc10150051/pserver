@@ -6,6 +6,7 @@
 #define PSERVER_FITTINGTASK_H
 
 
+#include <mutex>
 #include "AbstractTask.h"
 #include "module_formation_signal.h"
 #include "module_of_measurements.h"
@@ -22,6 +23,8 @@ private:
     PropertySensor _propSensor;
     ParamProbingSignal _paramSignal;
     int _sizeOut;
+    std::mutex fittingMutex;
+    bool isAlreadyConfigure;
 };
 
 #endif //PSERVER_FITTINGTASK_H

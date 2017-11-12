@@ -10,6 +10,10 @@
 #include <Poco/Random.h>
 #include <string>
 
+// wait between attempts to access the hardware
+const int WAIT_TIME_MS = 100;
+const int TRY_NUM = 3;
+
 ScanResonanceTask::ScanResonanceTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(config, "ScanResonanceTask") {
     LOG_DEBUG("Begin ScanResonanceTask");
 
@@ -43,15 +47,18 @@ ScanResonanceTask::ScanResonanceTask(const Poco::JSON::Object::Ptr& config) : Ab
 
     // принимаем многокомпонентный сигнал зондирования
     Poco::JSON::Array::Ptr signal = JsonHelper::getArrayProperty(config, "probingsignal");
-    _scanSteps = signal->size();
-    LOG_DEBUG("num steps: %d", _scanSteps);
-    for (int idx = 0; idx < _scanSteps; ++idx) {
+    int scanSteps = signal->size();
+    LOG_DEBUG("num steps: %d", scanSteps);
+    for (int idx = 0; idx < scanSteps; ++idx) {
         Poco::Dynamic::Var var = signal->get(idx);
         Poco::JSON::Object::Ptr obj = var.extract<Poco::JSON::Object::Ptr>();
         int m = JsonHelper::getIntProperty(obj, "m");
         int l = JsonHelper::getIntProperty(obj, "l");
-        double tau = Poco::NumberParser::parseFloat(JsonHelper::getStringProperty(obj, "tau"));  // секунды
-        double mfo = Poco::NumberParser::parseFloat(JsonHelper::getStringProperty(obj, "mfo"));  // секунды
+        std::string tauStr = JsonHelper::getStringProperty(obj, "tau");  // секунды
+        double tau = std::stof(tauStr);
+        std::string mfoStr = JsonHelper::getStringProperty(obj, "mfo");  // секунды
+        double mfo = std::stof(mfoStr);
+        LOG_DEBUG("step#%d m: %d l: %d tau: %E mfo: %E", idx, m, l, tau, mfo);
         _paramSignals.push_back(ParamProbingSignal(tau, l, m, mfo));
     }
 }
@@ -73,59 +80,34 @@ bool ScanResonanceTask::run() {
     double afc_fres = 1;    // afc на резонансной частоте
     int index_f_res = -1;   // Индекс резонансной частоты в массиве зондирования
     double x2_max = 0;      // максимальное значение квадрата эхосигнала на рез.частоте
-    int tryMeasure = 3;
-    int ret = -1000;
 
-    for (int step = 0; step < _scanSteps; ++step) {
+    auto scanning = [&](size_t step) {
         // суфикс
-        LOG_DEBUG("number probing %d", step);
+        LOG_DEBUG("Scan number probing %z", step);
         Status::setStatus("scan " + std::to_string(step));
 #if 1
         // настройка зондирования
         Module_of_measurements measure;
         // !!! пока зондируем однокомпонентным сигналом
-        tryMeasure = 3;
-        do {
-            try {
-                ret = measure.Setup(_paramSignals[0], _propSensor);
-            } catch (...) {
-                tryMeasure--;
-            }
-        } while (tryMeasure && ret != ME_OK);
-
-        if (ret != ME_OK) {
-            //TODO сюда воткнуть расшифровку ошибки std::map
-            throw Poco::Exception(Poco::format("Setup error: %d", ret));
+        const ParamProbingSignal& ps = _paramSignals[step];
+        LOG_DEBUG("Setup");
+        int ret = measure.Setup(ps, _propSensor);
+        if (ret < 0) {
+            return ret;
         }
-
         // запуск измерения
-        tryMeasure = 3;
-        do {
-            try {
-                ret = measure.Run(_paramProbing);
-            } catch (...) {
-                tryMeasure--;
-            }
-        } while (tryMeasure && ret != ME_OK);
-
-        if (ret != ME_OK) {
-            throw Poco::Exception(Poco::format("Run error: %d", ret));
+        ret = measure.Run(_paramProbing);
+        if (ret < 0) {
+            return ret;
         }
-
         // Получение модуля СФ-эхосигнала (энергия)
-        tryMeasure = 3;
+        long time = common_utils::timer_msec();
         MODULE_MF_ECHO mod_data;
-        do {
-            try {
-                ret = measure.GetModuleMFEcho(_position, mod_data);
-            } catch (...) {
-                tryMeasure--;
-            }
-        } while (tryMeasure && ret != ME_OK);
-
-        if (ret != ME_OK) {
-            throw Poco::Exception(Poco::format("GetSquareMFEcho error: %d", ret));
+        ret = measure.GetModuleMFEcho(_position, mod_data);
+        if (ret < 0) {
+            return ret;
         }
+        LOG_DEBUG("Время получения сигнала на %z шаге = %d ms", step, (int)(common_utils::timer_msec() - time));
 #else
         Poco::Random rnd;
         rnd.seed();
@@ -137,11 +119,11 @@ bool ScanResonanceTask::run() {
         Poco::Thread::sleep(1000);
 #endif
 
-        double afc = 0;
+        double afc = 0.;
 //            double afc_accumulate = 0;
 //            accumulate(sq_data.begin(), sq_data.end(), afc_accumulate);
-        int size_mod_data = mod_data.size();
-        for (int j = 0; j < size_mod_data; ++j) {
+        size_t size_mod_data = mod_data.size();
+        for (size_t j = 0; j < size_mod_data; ++j) {
             afc += mod_data[j];
         }
         LOG_DEBUG("afc_%d = %f", step, afc);
@@ -150,9 +132,32 @@ bool ScanResonanceTask::run() {
         // оценка afc
         if (afc > afc_fres) {
             afc_fres = afc;
-            index_f_res = step;
+            index_f_res = static_cast<int>(step);
             x2_max = *max_element(mod_data.begin(), mod_data.end());
         }
+        return ret;
+    };
+
+    size_t size = _paramSignals.size();
+    for (size_t step = 0; step < size; ++step) {
+        int tryNum = TRY_NUM;
+        do {
+            LOG_DEBUG("try #%d", tryNum);
+            long time = common_utils::timer_msec();
+            int ret = scanning(step);
+            LOG_DEBUG("Время измерения + вычисление энергии %z шага = %d ms", step, (int)(common_utils::timer_msec() - time));
+            if (ret < 0) {
+                if (!--tryNum) {
+                    throw Poco::Exception(Module_of_measurements::getMessageError(ret));
+                } else {
+                    // можно чуть подождать перед следующим разом
+                    LOG_DEBUG("Try #%d. Wait %d ms", tryNum, WAIT_TIME_MS);
+                    Poco::Thread::sleep(WAIT_TIME_MS);
+                }
+            } else {
+                tryNum = 0;
+            }
+        } while (tryNum);
     }
     Status::clear();
     /*
@@ -166,8 +171,8 @@ bool ScanResonanceTask::run() {
     _answer->set("max2", x2_max);
 
     Poco::JSON::Array jsonArray;
-    int size = vAfc.size();
-    for (int i = 0; i < size; ++i) {
+    size = vAfc.size();
+    for (size_t i = 0; i < size; ++i) {
         jsonArray.add(vAfc[i] / afc_fres);
     }
     _answer->set("afc", jsonArray);

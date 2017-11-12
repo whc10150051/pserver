@@ -7,10 +7,14 @@
 #include <Poco/SyslogChannel.h>
 #include <Poco/ConsoleChannel.h>
 #include <Poco/FileChannel.h>
+#include <Poco/SimpleFileChannel.h>
 #include <Poco/SplitterChannel.h>
 #include <Poco/PatternFormatter.h>
 #include <Poco/FormattingChannel.h>
 #include <Poco/Path.h>
+
+const Poco::Path LOG_DIRECTORY = "/var/log/";
+const std::string LOG_FILENAME = "pserver.log";
 
 Server::Server(int port, Poco::Net::TCPServerParams* params) :
         TCPServer(new Poco::Net::TCPServerConnectionFactoryImpl<Connection>(),
@@ -29,32 +33,35 @@ Server::~Server() {
 
 void Server::configureLogger() {
     try {
-        // перенести в  конфиг
-        const Poco::Path &logDirectory = "../log";
-        std::string logFileName = "pserver.log";
-        Poco::Path logPath(logDirectory, logFileName);
+        Poco::Path logPath(LOG_DIRECTORY, LOG_FILENAME);
+        std::cout << "Path logger: " << logPath.toString() << std::endl;
 
-        Poco::AutoPtr<Poco::PatternFormatter> formatter(new Poco::PatternFormatter());
-        formatter->setProperty("pattern", "%Y-%m-%d %H:%M:%S %s: [%p] %t");
-        formatter->setProperty("times", "local");
+        try {
+            _formatter = new Poco::PatternFormatter();
+            _formatter->setProperty("pattern", "%Y-%m-%d %H:%M:%S %s: [%p] %t");
+            _formatter->setProperty("times", "local");
+        } catch (const Poco::Exception& ex) {
+            std::cerr << "Server configure logger failed (Text mode)" << std::endl;
+            throw;
+        }
 
-        Poco::AutoPtr<Poco::FormattingChannel> consoleChannel(
-                new Poco::FormattingChannel(formatter, new Poco::ConsoleChannel()));
+        try {
+            _fileChannel = new Poco::FileChannel();
+            _fileChannel->setProperty("path", logPath.toString());
+            _fileChannel->setProperty("rotation", "20M");
+            _fileChannel->setProperty("compress", "true");
+            _fileChannel->setProperty("archive", "timestamp");
+            _fileChannel->setProperty("purgeCount", "20");
+        } catch (const Poco::Exception& ex) {
+            std::cerr << "Server configure logger failed (File mode)" << std::endl;
+            throw;
+        }
 
-//    formatter->setProperty("rotation", "2 K");
-//    formatter->setProperty("archive", "timestamp");
+        _channel = new Poco::FormattingChannel(_formatter.get(), _fileChannel.get());
+        _logger.setLevel(Poco::Message::Priority::PRIO_TRACE);
+        _logger.setChannel(_channel.get());
 
-//        Poco::AutoPtr<Poco::FormattingChannel> fileChannel = new Poco::FormattingChannel(formatter,
-//                                                                                         new Poco::FileChannel(
-//                                                                                                 logPath.toString()));
-
-        Poco::AutoPtr<Poco::SplitterChannel> splitter(new Poco::SplitterChannel);
-        splitter->addChannel(consoleChannel);
-//        splitter->addChannel(fileChannel);
-
-        Poco::Logger::root().setLevel(Poco::Message::Priority::PRIO_TRACE);
-        Poco::Logger::root().setChannel(splitter);
-    } catch (Poco::Exception& ex) {
+    } catch (const Poco::Exception& ex) {
         std::cerr << "Server configure logger failed: " << ex.displayText() << std::endl;
     }
 }

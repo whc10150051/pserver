@@ -24,5 +24,4 @@ private:
     ParamProbing _paramProbing;
     PositionData _position;
     std::vector<ParamProbingSignal> _paramSignals;
-    int _scanSteps;
 };
