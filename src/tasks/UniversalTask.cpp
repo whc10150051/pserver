@@ -8,7 +8,10 @@
 #include "JsonHelper.h"
 #include "module_of_measurements.h"
 #include <fstream>
+#include <unistd.h>
+#include <sys/reboot.h>
 #include <string>
+#include <thread>
 
 UniversalTask::UniversalTask(const Poco::JSON::Object::Ptr& config) : AbstractTask(config, "UniversalTask") {
     LOG_DEBUG("Begin UniversalTask");
@@ -84,9 +87,32 @@ bool UniversalTask::run() {
         _answer->set("type", _type);
         _answer->set("status", "ok");
 #if 1
+        sync();
         int gpio_shutdown = 68;
         common_utils::Gpio::init(gpio_shutdown, true/*out - это хак!!! этот пин всегда работает на прием*/);
         common_utils::Gpio::set(gpio_shutdown, 1);
+#else
+        Poco::Thread::sleep(100);
+#endif
+        LOG_DEBUG("End subtask %s", _type);
+    }
+
+
+    if (_type == "reboot") {
+
+        LOG_DEBUG("Begin subtask %s", _type);
+        _answer = new Poco::JSON::Object(true);
+        _answer->set("name", getName());
+        _answer->set("type", _type);
+        _answer->set("status", "ok");
+#if 1
+        sync();
+        std::thread t([](){
+            std::cout << "Reboot system" << std::endl;
+            sleep(5);
+            reboot(RB_AUTOBOOT);
+        });
+        t.detach();
 #else
         Poco::Thread::sleep(100);
 #endif
